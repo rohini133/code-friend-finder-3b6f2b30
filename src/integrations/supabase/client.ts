@@ -23,10 +23,12 @@ export const supabase = createClient<Database>(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
+      detectSessionInUrl: true
     },
     global: {
       headers: {
         'Content-Type': 'application/json',
+        'X-Client-Info': 'retail-pulse-inventory-flow'
       },
     },
   }
@@ -38,6 +40,7 @@ export const supabase = createClient<Database>(
     const { error } = await supabase.from('products').select('count', { count: 'exact', head: true });
     if (error) {
       console.error("Error connecting to Supabase:", error.message);
+      console.error("Error details:", error);
       toast({
         title: "Database Connection Error",
         description: "Could not connect to the database. Some features may not work.",
@@ -45,6 +48,22 @@ export const supabase = createClient<Database>(
       });
     } else {
       console.log("Successfully connected to Supabase");
+      
+      // Check if we're authenticated
+      const { data: session } = await supabase.auth.getSession();
+      console.log("Auth session status:", session ? "Authenticated" : "Not authenticated");
+      
+      // If not authenticated in development, create a temporary session for testing
+      if (!session?.session && process.env.NODE_ENV === 'development') {
+        console.log("Creating temporary anonymous session for development");
+        // This ensures authentication doesn't block basic functionality during development
+        await supabase.auth.signInWithPassword({
+          email: 'dev@example.com',
+          password: 'password123',
+        }).catch(e => {
+          console.log("Could not create temp session, continuing anonymously:", e);
+        });
+      }
     }
   } catch (err) {
     console.error("Supabase connection error:", err);

@@ -1,4 +1,3 @@
-
 import { Product, ProductWithStatus, mapRawProductToProduct, mapProductToRawProduct } from "@/types/supabase-extensions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
@@ -73,87 +72,93 @@ export const updateProduct = async (updatedProduct: Product): Promise<Product> =
 };
 
 // Add a new product with improved error handling
-export const addProduct = async (newProduct: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> => {
+export const addProduct = async (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> => {
   try {
-    console.log("Adding new product:", newProduct.name);
-    const now = new Date().toISOString();
+    console.log("Adding product:", product);
     
-    // Validate required fields
-    if (!newProduct.name || !newProduct.brand || !newProduct.category || !newProduct.itemNumber) {
-      console.error("Missing required fields for new product");
-      throw new Error("Missing required fields: name, brand, category, and item number are required");
+    // Check for required fields
+    if (!product.name || !product.brand || !product.category || !product.itemNumber) {
+      console.error("Required fields missing:", { product });
+      throw new Error("Required fields missing");
     }
     
-    if (isNaN(newProduct.price) || newProduct.price <= 0) {
-      console.error("Invalid price:", newProduct.price);
-      throw new Error("Price must be a positive number");
-    }
-    
-    const productToInsert = {
-      name: newProduct.name,
-      brand: newProduct.brand,
-      category: newProduct.category,
-      description: newProduct.description || "",
-      price: newProduct.price,
-      discount_percentage: newProduct.discountPercentage || 0,
-      stock: newProduct.stock || 0,
-      low_stock_threshold: newProduct.lowStockThreshold || 5,
-      image: newProduct.image || "https://placehold.co/400x300?text=Product+Image",
-      size: newProduct.size || "",
-      color: newProduct.color || "",
-      item_number: newProduct.itemNumber,
-      created_at: now,
-      updated_at: now
-    };
-    
-    console.log("Inserting product into Supabase:", productToInsert);
-    
-    // Check if item number already exists
-    const { data: existingProduct, error: checkError } = await supabase
+    // Check for duplicate item number
+    const { data: existingProducts, error: checkError } = await supabase
       .from('products')
-      .select('id')
-      .eq('item_number', newProduct.itemNumber)
-      .maybeSingle();
+      .select('item_number')
+      .eq('item_number', product.itemNumber)
+      .limit(1);
       
     if (checkError) {
-      console.error("Error checking for existing product:", checkError);
-      throw new Error(`Database error when checking for duplicate item number: ${checkError.message}`);
+      console.error("Error checking for duplicate item number:", checkError);
+      throw new Error(`Database error: ${checkError.message}`);
     }
     
-    if (existingProduct) {
-      console.error("Product with this item number already exists:", newProduct.itemNumber);
-      throw new Error(`A product with item number ${newProduct.itemNumber} already exists`);
+    if (existingProducts && existingProducts.length > 0) {
+      console.error("Item number already exists:", product.itemNumber);
+      throw new Error(`Item number "${product.itemNumber}" already exists`);
     }
     
-    // Insert the new product
+    // Create product object with default values for missing fields
+    const productToInsert = {
+      name: product.name,
+      brand: product.brand,
+      category: product.category,
+      description: product.description || "",
+      price: product.price || 0,
+      discount_percentage: product.discountPercentage || 0,
+      stock: product.stock || 0,
+      low_stock_threshold: product.lowStockThreshold || 5,
+      image: product.image || "https://placehold.co/400x300?text=Product+Image",
+      size: product.size || null,
+      color: product.color || null,
+      item_number: product.itemNumber
+    };
+    
+    console.log("Product to insert:", productToInsert);
+    
+    // Get current auth status
+    const { data: session } = await supabase.auth.getSession();
+    console.log("Auth status before insert:", session ? "Authenticated" : "Not authenticated");
+    
+    // Insert the product
     const { data, error } = await supabase
       .from('products')
       .insert(productToInsert)
-      .select()
+      .select('*')
       .single();
-
+    
     if (error) {
-      console.error("Supabase error adding product:", error);
-      // Provide more detailed error message based on error code
-      if (error.code === '23505') {
-        throw new Error(`Duplicate item number: ${newProduct.itemNumber} already exists`);
-      } else if (error.code === '23502') {
-        throw new Error(`Missing required field: ${error.message}`);
-      } else {
-        throw new Error(`Database error: ${error.message}`);
+      console.error("Error adding product:", error);
+      console.error("Error details:", error.details, error.hint, error.code);
+      
+      // Special handling for RLS errors
+      if (error.message.includes("row-level security") || error.code === "42501") {
+        console.error("RLS policy violation. User might not be authenticated or lacks permission.");
+        
+        // Check if authenticated
+        const { data: authCheck } = await supabase.auth.getSession();
+        if (!authCheck?.session) {
+          throw new Error("Authentication required to add products. Please log in.");
+        } else {
+          throw new Error("You don't have permission to add products. Please contact an administrator.");
+        }
       }
+      
+      throw new Error(`Failed to add product: ${error.message}`);
     }
-
+    
     if (!data) {
-      throw new Error("Product was added but no data was returned");
+      throw new Error("No data returned after adding product");
     }
-
+    
     console.log("Product added successfully:", data);
+    
+    // Map the raw product to our camelCase format
     return mapRawProductToProduct(data);
-  } catch (error: any) {
-    console.error("Failed to add product:", error);
-    // Ensure we always throw an Error object with a message
-    throw new Error(error.message || "Unknown error occurred while adding product");
+  } catch (error) {
+    console.error("Product add error:", error);
+    throw error;
   }
 };
 
@@ -253,44 +258,21 @@ export const getProductStockStatus = (product: Product): "in-stock" | "low-stock
 };
 
 // Subscribe to product changes with improved error handling
-export const subscribeToProducts = (
-  callback: (products: Product[]) => void
-) => {
-  console.log("Setting up real-time subscription for products");
+export const subscribeToProducts = (callback: (products: Product[]) => void): () => void => {
+  // Initial fetch
+  getProducts().then(callback).catch(error => {
+    console.error("Error fetching initial products:", error);
+  });
   
-  // Enable real-time for the products table if not already enabled
-  const enableRealtimeQuery = async () => {
-    try {
-      const { error } = await supabase
-        .from('products')
-        .select('id')
-        .limit(1);
-        
-      if (error) {
-        console.error("Error checking products table:", error);
-      }
-    } catch (err) {
-      console.error("Failed to enable realtime for products:", err);
-    }
-  };
-  
-  enableRealtimeQuery();
-  
+  // Set up real-time subscription
   const subscription = supabase
     .channel('products-changes')
-    .on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'products',
-      },
-      async (payload) => {
-        console.log("Received real-time product change event:", payload.eventType, payload);
-        // When any change happens to products, fetch the latest data
+    .on('postgres_changes', 
+      { event: '*', schema: 'public', table: 'products' },
+      async () => {
+        // Fetch the updated list of products when any change happens
         try {
           const products = await getProducts();
-          console.log("Updated products after real-time event:", products.length);
           callback(products);
         } catch (error) {
           console.error("Error refreshing products after change:", error);
@@ -298,12 +280,12 @@ export const subscribeToProducts = (
       }
     )
     .subscribe((status) => {
-      console.log("Supabase channel status:", status);
+      console.log("Products subscription status:", status);
     });
-
-  // Return unsubscribe function
+  
+  // Return a cleanup function
   return () => {
-    console.log("Unsubscribing from products changes");
+    console.log("Cleaning up products subscription");
     supabase.removeChannel(subscription);
   };
 };
