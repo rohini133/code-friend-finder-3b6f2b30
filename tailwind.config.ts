@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -61,6 +62,31 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Custom colors for Code Friend Finder
+				codeblue: {
+					50: '#EFF6FF',
+					100: '#DBEAFE',
+					200: '#BFDBFE',
+					300: '#93C5FD',
+					400: '#60A5FA',
+					500: '#3B82F6',
+					600: '#2563EB',
+					700: '#1D4ED8',
+					800: '#1E40AF',
+					900: '#1E3A8A'
+				},
+				codepurple: {
+					50: '#FAF5FF',
+					100: '#F3E8FF',
+					200: '#E9D5FF',
+					300: '#D8B4FE',
+					400: '#C084FC',
+					500: '#A855F7',
+					600: '#9333EA',
+					700: '#7E22CE',
+					800: '#6B21A8',
+					900: '#581C87'
 				}
 			},
 			borderRadius: {
@@ -84,11 +110,20 @@ export default {
 					to: {
 						height: '0'
 					}
+				},
+				'pulse-slow': {
+					'0%, 100%': { opacity: '1' },
+					'50%': { opacity: '0.8' }
 				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
-				'accordion-up': 'accordion-up 0.2s ease-out'
+				'accordion-up': 'accordion-up 0.2s ease-out',
+				'pulse-slow': 'pulse-slow 3s ease-in-out infinite'
+			},
+			fontFamily: {
+				sans: ['Inter', 'sans-serif'],
+				mono: ['Roboto Mono', 'monospace']
 			}
 		}
 	},
