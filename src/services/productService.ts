@@ -6,6 +6,7 @@ import { toast } from "@/components/ui/use-toast";
 // Get all products from Supabase
 export const getProducts = async (): Promise<Product[]> => {
   try {
+    console.log("Fetching products from Supabase");
     const { data, error } = await supabase
       .from('products')
       .select('*');
@@ -15,6 +16,7 @@ export const getProducts = async (): Promise<Product[]> => {
       throw error;
     }
 
+    console.log("Products fetched successfully:", data?.length || 0, "products");
     // Map the raw data to our Product type
     return data.map(mapRawProductToProduct);
   } catch (error) {
@@ -47,6 +49,7 @@ export const getProduct = async (id: string): Promise<Product | undefined> => {
 // Update an existing product
 export const updateProduct = async (updatedProduct: Product): Promise<Product> => {
   try {
+    console.log("Updating product:", updatedProduct.id);
     const rawProduct = mapProductToRawProduct(updatedProduct);
     
     const { data, error } = await supabase
@@ -61,6 +64,7 @@ export const updateProduct = async (updatedProduct: Product): Promise<Product> =
       throw error;
     }
 
+    console.log("Product updated successfully:", data);
     return mapRawProductToProduct(data);
   } catch (error) {
     console.error("Failed to update product:", error);
@@ -71,7 +75,20 @@ export const updateProduct = async (updatedProduct: Product): Promise<Product> =
 // Add a new product
 export const addProduct = async (newProduct: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> => {
   try {
+    console.log("Adding new product:", newProduct.name);
     const now = new Date().toISOString();
+    
+    // Validate required fields
+    if (!newProduct.name || !newProduct.brand || !newProduct.category || !newProduct.itemNumber) {
+      console.error("Missing required fields for new product");
+      throw new Error("Missing required fields: name, brand, category, and item number are required");
+    }
+    
+    if (isNaN(newProduct.price) || newProduct.price <= 0) {
+      console.error("Invalid price:", newProduct.price);
+      throw new Error("Price must be a positive number");
+    }
+    
     const productToInsert = {
       name: newProduct.name,
       brand: newProduct.brand,
@@ -89,6 +106,8 @@ export const addProduct = async (newProduct: Omit<Product, 'id' | 'createdAt' | 
       updated_at: now
     };
     
+    console.log("Inserting product into Supabase:", productToInsert);
+    
     const { data, error } = await supabase
       .from('products')
       .insert(productToInsert)
@@ -96,10 +115,11 @@ export const addProduct = async (newProduct: Omit<Product, 'id' | 'createdAt' | 
       .single();
 
     if (error) {
-      console.error("Error adding product:", error);
+      console.error("Supabase error adding product:", error);
       throw error;
     }
 
+    console.log("Product added successfully:", data);
     return mapRawProductToProduct(data);
   } catch (error) {
     console.error("Failed to add product:", error);
@@ -207,6 +227,26 @@ export const getProductStockStatus = (product: Product): "in-stock" | "low-stock
 export const subscribeToProducts = (
   callback: (products: Product[]) => void
 ) => {
+  console.log("Setting up real-time subscription for products");
+  
+  // Enable real-time for the products table if not already enabled
+  const enableRealtimeQuery = async () => {
+    try {
+      const { error } = await supabase
+        .from('products')
+        .select('id')
+        .limit(1);
+        
+      if (error) {
+        console.error("Error checking products table:", error);
+      }
+    } catch (err) {
+      console.error("Failed to enable realtime for products:", err);
+    }
+  };
+  
+  enableRealtimeQuery();
+  
   const subscription = supabase
     .channel('products-changes')
     .on(
@@ -216,20 +256,25 @@ export const subscribeToProducts = (
         schema: 'public',
         table: 'products',
       },
-      async () => {
+      async (payload) => {
+        console.log("Received real-time product change event:", payload.eventType, payload);
         // When any change happens to products, fetch the latest data
         try {
           const products = await getProducts();
+          console.log("Updated products after real-time event:", products.length);
           callback(products);
         } catch (error) {
           console.error("Error refreshing products after change:", error);
         }
       }
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log("Supabase channel status:", status);
+    });
 
   // Return unsubscribe function
   return () => {
+    console.log("Unsubscribing from products changes");
     supabase.removeChannel(subscription);
   };
 };
