@@ -72,7 +72,7 @@ export const updateProduct = async (updatedProduct: Product): Promise<Product> =
   }
 };
 
-// Add a new product
+// Add a new product with improved error handling
 export const addProduct = async (newProduct: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> => {
   try {
     console.log("Adding new product:", newProduct.name);
@@ -93,14 +93,14 @@ export const addProduct = async (newProduct: Omit<Product, 'id' | 'createdAt' | 
       name: newProduct.name,
       brand: newProduct.brand,
       category: newProduct.category,
-      description: newProduct.description,
+      description: newProduct.description || "",
       price: newProduct.price,
-      discount_percentage: newProduct.discountPercentage,
-      stock: newProduct.stock,
-      low_stock_threshold: newProduct.lowStockThreshold,
-      image: newProduct.image,
-      size: newProduct.size,
-      color: newProduct.color,
+      discount_percentage: newProduct.discountPercentage || 0,
+      stock: newProduct.stock || 0,
+      low_stock_threshold: newProduct.lowStockThreshold || 5,
+      image: newProduct.image || "https://placehold.co/400x300?text=Product+Image",
+      size: newProduct.size || "",
+      color: newProduct.color || "",
       item_number: newProduct.itemNumber,
       created_at: now,
       updated_at: now
@@ -108,6 +108,24 @@ export const addProduct = async (newProduct: Omit<Product, 'id' | 'createdAt' | 
     
     console.log("Inserting product into Supabase:", productToInsert);
     
+    // Check if item number already exists
+    const { data: existingProduct, error: checkError } = await supabase
+      .from('products')
+      .select('id')
+      .eq('item_number', newProduct.itemNumber)
+      .maybeSingle();
+      
+    if (checkError) {
+      console.error("Error checking for existing product:", checkError);
+      throw new Error(`Database error when checking for duplicate item number: ${checkError.message}`);
+    }
+    
+    if (existingProduct) {
+      console.error("Product with this item number already exists:", newProduct.itemNumber);
+      throw new Error(`A product with item number ${newProduct.itemNumber} already exists`);
+    }
+    
+    // Insert the new product
     const { data, error } = await supabase
       .from('products')
       .insert(productToInsert)
@@ -116,14 +134,26 @@ export const addProduct = async (newProduct: Omit<Product, 'id' | 'createdAt' | 
 
     if (error) {
       console.error("Supabase error adding product:", error);
-      throw error;
+      // Provide more detailed error message based on error code
+      if (error.code === '23505') {
+        throw new Error(`Duplicate item number: ${newProduct.itemNumber} already exists`);
+      } else if (error.code === '23502') {
+        throw new Error(`Missing required field: ${error.message}`);
+      } else {
+        throw new Error(`Database error: ${error.message}`);
+      }
+    }
+
+    if (!data) {
+      throw new Error("Product was added but no data was returned");
     }
 
     console.log("Product added successfully:", data);
     return mapRawProductToProduct(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to add product:", error);
-    throw error;
+    // Ensure we always throw an Error object with a message
+    throw new Error(error.message || "Unknown error occurred while adding product");
   }
 };
 
@@ -153,11 +183,10 @@ export const decreaseStock = async (productId: string, quantity: number = 1): Pr
     }
 
     // Update with new stock
-    const newStock = product.stock - quantity;
     const { data, error } = await supabase
       .from('products')
       .update({ 
-        stock: newStock,
+        stock: product.stock - quantity,
         updated_at: new Date().toISOString()
       })
       .eq('id', productId)
@@ -223,7 +252,7 @@ export const getProductStockStatus = (product: Product): "in-stock" | "low-stock
   return "in-stock";
 };
 
-// Subscribe to product changes
+// Subscribe to product changes with improved error handling
 export const subscribeToProducts = (
   callback: (products: Product[]) => void
 ) => {

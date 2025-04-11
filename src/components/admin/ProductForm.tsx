@@ -106,6 +106,27 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     try {
       console.log("Form submission values:", values);
       
+      // Additional validation
+      if (!values.name.trim()) {
+        throw new Error("Product name is required");
+      }
+      
+      if (!values.brand.trim()) {
+        throw new Error("Brand is required");
+      }
+      
+      if (!values.category.trim()) {
+        throw new Error("Category is required");
+      }
+      
+      if (!values.itemNumber.trim()) {
+        throw new Error("Item number is required");
+      }
+      
+      if (values.price <= 0) {
+        throw new Error("Price must be greater than zero");
+      }
+      
       if (isEditing && product) {
         console.log("Updating existing product:", product.id);
         await updateProduct({
@@ -145,7 +166,11 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     } catch (error) {
       console.error("Error in product form:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      
+      // Set more detailed error message
       setFormError(errorMessage);
+      
+      // Show toast with specific error message
       toast({
         title: isEditing ? "Update failed" : "Add failed",
         description: `Failed to ${isEditing ? 'update' : 'add'} product: ${errorMessage}`,

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,99 +16,104 @@ import Settings from "./pages/Settings";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Index from "./pages/Index";
+import { ShopProvider } from "@/contexts/ShopContext";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Index />} />
-            
-            {/* Protected routes */}
-            <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/billing" 
-              element={
-                <ProtectedRoute>
-                  <Billing />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/bill-history" 
-              element={
-                <ProtectedRoute>
-                  <BillHistory />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/inventory" 
-              element={
-                <ProtectedRoute requiredRole="admin" restrictedRoles={["cashier"]}>
-                  <Inventory />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/products" 
-              element={
-                <ProtectedRoute requiredRole="admin" restrictedRoles={["cashier"]}>
-                  <Products />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/admin" 
-              element={
-                <ProtectedRoute requiredRole="admin" restrictedRoles={["cashier"]}>
-                  <AdminPanel />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/profile" 
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/settings" 
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <ShopProvider>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={<Index />} />
+                
+                {/* Protected routes */}
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/billing" 
+                  element={
+                    <ProtectedRoute>
+                      <Billing />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/bill-history" 
+                  element={
+                    <ProtectedRoute>
+                      <BillHistory />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/inventory" 
+                  element={
+                    <ProtectedRoute requiredRole="admin" restrictedRoles={["cashier"]}>
+                      <Inventory />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/products" 
+                  element={
+                    <ProtectedRoute requiredRole="admin" restrictedRoles={["cashier"]}>
+                      <Products />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/admin" 
+                  element={
+                    <ProtectedRoute requiredRole="admin" restrictedRoles={["cashier"]}>
+                      <AdminPanel />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/profile" 
+                  element={
+                    <ProtectedRoute>
+                      <Profile />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route 
+                  path="/settings" 
+                  element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </ShopProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
 
 export default App;
