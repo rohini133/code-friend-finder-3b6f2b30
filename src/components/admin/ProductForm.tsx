@@ -104,7 +104,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           description: `${values.name} has been updated successfully.`,
         });
       } else {
-        // Fix: Ensure all required fields are explicitly provided
+        // Add a new product
         await addProduct({
           name: values.name,
           brand: values.brand,
@@ -126,6 +126,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
       }
       onSuccess();
     } catch (error) {
+      console.error("Error in product form:", error);
       toast({
         title: isEditing ? "Update failed" : "Add failed",
         description: `Failed to ${isEditing ? 'update' : 'add'} product. Please try again.`,

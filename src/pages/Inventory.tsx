@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ProductCard } from "@/components/inventory/ProductCard";
 import { Product } from "@/data/models";
-import { getProducts, updateProduct } from "@/services/productService";
+import { getProducts, updateProduct, deleteProduct, subscribeToProducts } from "@/services/productService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -43,6 +43,16 @@ const Inventory = () => {
 
   useEffect(() => {
     fetchProducts();
+
+    // Set up real-time subscription
+    const unsubscribe = subscribeToProducts((updatedProducts) => {
+      setProducts(updatedProducts);
+    });
+
+    // Clean up subscription on unmount
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -55,6 +65,7 @@ const Inventory = () => {
       const data = await getProducts();
       setProducts(data);
     } catch (error) {
+      console.error("Error fetching products:", error);
       toast({
         title: "Error",
         description: "Failed to load products. Please try again.",
@@ -92,11 +103,6 @@ const Inventory = () => {
 
     try {
       await updateProduct(editingProduct);
-      setProducts(
-        products.map((p) =>
-          p.id === editingProduct.id ? editingProduct : p
-        )
-      );
       setIsEditDialogOpen(false);
       
       toast({
@@ -104,6 +110,7 @@ const Inventory = () => {
         description: `${editingProduct.name} has been updated successfully.`,
       });
     } catch (error) {
+      console.error("Error updating product:", error);
       toast({
         title: "Update failed",
         description: "Failed to update product. Please try again.",
@@ -116,7 +123,7 @@ const Inventory = () => {
     if (!deletingProduct) return;
 
     try {
-      setProducts(products.filter((p) => p.id !== deletingProduct.id));
+      await deleteProduct(deletingProduct.id);
       setIsDeleteDialogOpen(false);
       
       toast({
@@ -124,6 +131,7 @@ const Inventory = () => {
         description: `${deletingProduct.name} has been deleted successfully.`,
       });
     } catch (error) {
+      console.error("Error deleting product:", error);
       toast({
         title: "Delete failed",
         description: "Failed to delete product. Please try again.",
@@ -139,7 +147,7 @@ const Inventory = () => {
 
   const handleAddProductSuccess = () => {
     setIsAddProductDialogOpen(false);
-    fetchProducts();
+    // No need to fetch products manually as the subscription will handle it
   };
 
   return (

@@ -1,9 +1,8 @@
-
 import { useEffect, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Product } from "@/data/models";
-import { getProductStockStatus, getProducts } from "@/services/productService";
+import { getProductStockStatus, getProducts, subscribeToProducts, deleteProduct } from "@/services/productService";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,6 +25,16 @@ const Products = () => {
 
   useEffect(() => {
     fetchProducts();
+
+    // Set up real-time subscription
+    const unsubscribe = subscribeToProducts((updatedProducts) => {
+      setProducts(updatedProducts);
+    });
+
+    // Clean up subscription on unmount
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -39,6 +48,7 @@ const Products = () => {
       setProducts(data);
       setFilteredProducts(data);
     } catch (error) {
+      console.error("Error fetching products:", error);
       toast({
         title: "Error",
         description: "Failed to load products. Please try again.",
@@ -73,7 +83,7 @@ const Products = () => {
 
   const handleAddProductSuccess = () => {
     setIsAddProductDialogOpen(false);
-    fetchProducts();
+    // No need to fetch products manually as the subscription will handle it
     toast({
       title: "Product Added",
       description: "The product has been successfully added to inventory.",
@@ -83,7 +93,7 @@ const Products = () => {
   const handleEditProductSuccess = () => {
     setIsEditProductDialogOpen(false);
     setSelectedProduct(null);
-    fetchProducts();
+    // No need to fetch products manually as the subscription will handle it
     toast({
       title: "Product Updated",
       description: "The product has been successfully updated.",
@@ -93,6 +103,23 @@ const Products = () => {
   const handleEdit = (product: Product) => {
     setSelectedProduct(product);
     setIsEditProductDialogOpen(true);
+  };
+
+  const handleDelete = async (product: Product) => {
+    try {
+      await deleteProduct(product.id);
+      toast({
+        title: "Product Deleted",
+        description: "The product has been successfully deleted.",
+      });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      toast({
+        title: "Delete Failed",
+        description: "Failed to delete the product. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -241,7 +268,9 @@ const Products = () => {
                         >
                           Edit
                         </Button>
-                        <Button size="sm" variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600">Delete</Button>
+                        <Button size="sm" variant="outline" className="text-red-500 border-red-200 hover:bg-red-50 hover:text-red-600" onClick={() => handleDelete(product)}>
+                          Delete
+                        </Button>
                       </div>
                     )}
                   </CardContent>

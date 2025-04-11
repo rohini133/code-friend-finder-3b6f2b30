@@ -1,100 +1,196 @@
 
 import { Product, ProductWithStatus, mapRawProductToProduct, mapProductToRawProduct } from "@/types/supabase-extensions";
-import { sampleProducts } from "@/data/sampleData";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
 
-// In a real application, these functions would make API calls to a backend
-let products = [...sampleProducts];
-
+// Get all products from Supabase
 export const getProducts = async (): Promise<Product[]> => {
-  // Simulate API fetch delay
-  await new Promise(resolve => setTimeout(resolve, 300));
-  return [...products];
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*');
+
+    if (error) {
+      console.error("Error fetching products:", error);
+      throw error;
+    }
+
+    // Map the raw data to our Product type
+    return data.map(mapRawProductToProduct);
+  } catch (error) {
+    console.error("Failed to fetch products:", error);
+    throw error;
+  }
 };
 
+// Get a single product by ID
 export const getProduct = async (id: string): Promise<Product | undefined> => {
-  // Simulate API fetch delay
-  await new Promise(resolve => setTimeout(resolve, 200));
-  return products.find(product => product.id === id);
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) {
+      console.error("Error fetching product:", error);
+      throw error;
+    }
+
+    return mapRawProductToProduct(data);
+  } catch (error) {
+    console.error("Failed to fetch product:", error);
+    throw error;
+  }
 };
 
+// Update an existing product
 export const updateProduct = async (updatedProduct: Product): Promise<Product> => {
-  // Simulate API fetch delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  const index = products.findIndex(p => p.id === updatedProduct.id);
-  if (index === -1) {
-    throw new Error("Product not found");
+  try {
+    const rawProduct = mapProductToRawProduct(updatedProduct);
+    
+    const { data, error } = await supabase
+      .from('products')
+      .update(rawProduct)
+      .eq('id', updatedProduct.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating product:", error);
+      throw error;
+    }
+
+    return mapRawProductToProduct(data);
+  } catch (error) {
+    console.error("Failed to update product:", error);
+    throw error;
   }
-  
-  products[index] = {
-    ...updatedProduct,
-    updatedAt: new Date().toISOString()
-  };
-  
-  return products[index];
 };
 
-// Fixed type definition to match Product model requirements
+// Add a new product
 export const addProduct = async (newProduct: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> => {
-  // Simulate API fetch delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  const now = new Date().toISOString();
-  const product: Product = {
-    ...newProduct,
-    id: `p${products.length + 1}`,
-    createdAt: now,
-    updatedAt: now
-  };
-  
-  products.push(product);
-  return product;
+  try {
+    const now = new Date().toISOString();
+    const productToInsert = {
+      name: newProduct.name,
+      brand: newProduct.brand,
+      category: newProduct.category,
+      description: newProduct.description,
+      price: newProduct.price,
+      discount_percentage: newProduct.discountPercentage,
+      stock: newProduct.stock,
+      low_stock_threshold: newProduct.lowStockThreshold,
+      image: newProduct.image,
+      size: newProduct.size,
+      color: newProduct.color,
+      item_number: newProduct.itemNumber,
+      created_at: now,
+      updated_at: now
+    };
+    
+    const { data, error } = await supabase
+      .from('products')
+      .insert(productToInsert)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding product:", error);
+      throw error;
+    }
+
+    return mapRawProductToProduct(data);
+  } catch (error) {
+    console.error("Failed to add product:", error);
+    throw error;
+  }
 };
 
+// Decrease product stock
 export const decreaseStock = async (productId: string, quantity: number = 1): Promise<Product> => {
-  // Simulate API fetch delay
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  const index = products.findIndex(p => p.id === productId);
-  if (index === -1) {
-    throw new Error("Product not found");
+  try {
+    // First get the current product
+    const { data: productData, error: fetchError } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single();
+
+    if (fetchError) {
+      throw fetchError;
+    }
+
+    const product = mapRawProductToProduct(productData);
+    
+    if (product.stock < quantity) {
+      toast({
+        title: "Insufficient stock",
+        description: `Cannot decrease stock of ${product.name} by ${quantity} as only ${product.stock} remain.`,
+        variant: "destructive"
+      });
+      throw new Error("Insufficient stock");
+    }
+
+    // Update with new stock
+    const newStock = product.stock - quantity;
+    const { data, error } = await supabase
+      .from('products')
+      .update({ 
+        stock: newStock,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', productId)
+      .select()
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    const updatedProduct = mapRawProductToProduct(data);
+    
+    // Check if stock is low after update
+    if (updatedProduct.stock <= updatedProduct.lowStockThreshold && updatedProduct.stock > 0) {
+      toast({
+        title: "Low Stock Alert",
+        description: `${updatedProduct.name} is running low on stock (${updatedProduct.stock} remaining).`,
+        variant: "default"
+      });
+    }
+    
+    // Check if out of stock after update
+    if (updatedProduct.stock === 0) {
+      toast({
+        title: "Out of Stock Alert",
+        description: `${updatedProduct.name} is now out of stock.`,
+        variant: "destructive"
+      });
+    }
+    
+    return updatedProduct;
+  } catch (error) {
+    console.error("Failed to decrease stock:", error);
+    throw error;
   }
-  
-  if (products[index].stock < quantity) {
-    toast({
-      title: "Insufficient stock",
-      description: `Cannot decrease stock of ${products[index].name} by ${quantity} as only ${products[index].stock} remain.`,
-      variant: "destructive"
-    });
-    throw new Error("Insufficient stock");
+};
+
+// Delete a product
+export const deleteProduct = async (productId: string): Promise<void> => {
+  try {
+    const { error } = await supabase
+      .from('products')
+      .delete()
+      .eq('id', productId);
+
+    if (error) {
+      console.error("Error deleting product:", error);
+      throw error;
+    }
+  } catch (error) {
+    console.error("Failed to delete product:", error);
+    throw error;
   }
-  
-  products[index] = {
-    ...products[index],
-    stock: products[index].stock - quantity,
-    updatedAt: new Date().toISOString()
-  };
-  
-  // Check if stock is low after update
-  if (products[index].stock <= products[index].lowStockThreshold && products[index].stock > 0) {
-    toast({
-      title: "Low Stock Alert",
-      description: `${products[index].name} is running low on stock (${products[index].stock} remaining).`,
-      variant: "default"
-    });
-  }
-  
-  // Check if out of stock after update
-  if (products[index].stock === 0) {
-    toast({
-      title: "Out of Stock Alert",
-      description: `${products[index].name} is now out of stock.`,
-      variant: "destructive"
-    });
-  }
-  
-  return products[index];
 };
 
 export const getProductStockStatus = (product: Product): "in-stock" | "low-stock" | "out-of-stock" => {
@@ -105,4 +201,35 @@ export const getProductStockStatus = (product: Product): "in-stock" | "low-stock
     return "low-stock";
   }
   return "in-stock";
+};
+
+// Subscribe to product changes
+export const subscribeToProducts = (
+  callback: (products: Product[]) => void
+) => {
+  const subscription = supabase
+    .channel('products-changes')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'products',
+      },
+      async () => {
+        // When any change happens to products, fetch the latest data
+        try {
+          const products = await getProducts();
+          callback(products);
+        } catch (error) {
+          console.error("Error refreshing products after change:", error);
+        }
+      }
+    )
+    .subscribe();
+
+  // Return unsubscribe function
+  return () => {
+    supabase.removeChannel(subscription);
+  };
 };
