@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
@@ -37,8 +36,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Auto-login for development - this will automatically log in with admin credentials
+  useEffect(() => {
+    const autoLogin = async () => {
+      console.log("Checking for existing session...");
+      const { data } = await supabase.auth.getSession();
+      
+      if (!data.session) {
+        console.log("No session found. Attempting auto-login for development...");
+        try {
+          // Auto-login with first admin user
+          const adminUser = USERS[0]; // Use the first user (admin)
+          const { success, error } = await enhancedLogin(adminUser.email, adminUser.password);
+          
+          if (success) {
+            console.log("Auto-login successful");
+            localStorage.setItem("isLoggedIn", "true");
+            localStorage.setItem("userRole", adminUser.role);
+            localStorage.setItem("username", adminUser.name);
+            
+            setIsLoggedIn(true);
+            setUserRole(adminUser.role);
+            setUserName(adminUser.name);
+            
+            toast({
+              title: "Auto-Login Successful",
+              description: `Welcome back, ${adminUser.name}! (Auto-login for development)`,
+            });
+          } else {
+            console.error("Auto-login failed:", error);
+          }
+        } catch (err) {
+          console.error("Auto-login error:", err);
+        }
+      }
+      setIsInitializing(false);
+    };
+    
+    autoLogin();
+  }, [toast]);
 
   // Check for active Supabase session on mount and auth state changes
   useEffect(() => {
@@ -222,6 +262,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     return true;
   };
+
+  // If still initializing, we can show a loading state or return children
+  if (isInitializing) {
+    // You can either return null or a loading component here
+    // For simplicity, we'll just return children so the app loads
+    return <>{children}</>;
+  }
 
   return (
     <AuthContext.Provider value={{ isLoggedIn, userRole, userName, login, logout, checkAuthAccess }}>

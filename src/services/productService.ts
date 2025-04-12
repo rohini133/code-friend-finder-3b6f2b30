@@ -7,4 +7,4 @@ export { updateProduct, addProduct, decreaseStock } from "./product/productMutat
 export { getProductStockStatus } from "./product/productHelpers";
 
 // Export an online mode flag to control behavior throughout the app
-export const ONLINE_MODE = true; // Set to true to enforce direct Supabase writes
+export const ONLINE_MODE = true; // Force online mode to ensure direct Supabase writes

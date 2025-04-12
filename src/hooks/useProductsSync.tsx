@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { supabase, debugAuthStatus, checkActiveSession, enhancedLogin } from '@/integrations/supabase/client';
+import { supabase, debugAuthStatus, checkActiveSession } from '@/integrations/supabase/client';
 import { Product } from '@/data/models';
 import { getProducts } from '@/services/productService';
 import { useToast } from '@/components/ui/use-toast';
@@ -21,35 +21,12 @@ export function useProductsSync() {
       setIsAuthenticated(authStatus.isAuthenticated);
       
       if (!authStatus.isAuthenticated) {
-        console.warn("Not authenticated. Attempting automatic login for development...");
-        
-        try {
-          // For development - try to auto-login if not authenticated
-          // This is just for development convenience - should be removed in production
-          const result = await enhancedLogin(
-            'admin@example.com', 
-            'password123'
-          );
-          
-          if (result.success) {
-            console.log("Auto-login successful:", result);
-            setIsAuthenticated(true);
-            toast({
-              title: "Auto-login successful",
-              description: "Using default development credentials",
-            });
-          } else {
-            setError("Not authenticated. Please log in to view and modify products.");
-            toast({
-              title: "Authentication required",
-              description: "Please log in to access product data",
-              variant: "destructive",
-            });
-          }
-        } catch (e) {
-          console.error("Auto-login failed:", e);
-          setError("Not authenticated. Please log in to view and modify products.");
-        }
+        setError("Not authenticated. Please log in to view and modify products.");
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to access product data",
+          variant: "destructive",
+        });
       }
     };
     
@@ -82,6 +59,7 @@ export function useProductsSync() {
           description: err.message || "Failed to load products. Please try again.",
           variant: "destructive",
         });
+        // Don't set products to empty array here to preserve any previously loaded data
       } finally {
         setIsLoading(false);
       }
@@ -90,6 +68,8 @@ export function useProductsSync() {
     // Only fetch if authenticated
     if (isAuthenticated) {
       fetchProducts();
+    } else {
+      setIsLoading(false); // Stop loading state if not authenticated
     }
   }, [toast, isAuthenticated]);
 

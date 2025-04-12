@@ -18,7 +18,7 @@ import { z } from "zod";
 import { useToast } from "@/components/ui/use-toast";
 import { addProduct, updateProduct } from "@/services/productService";
 import { Loader2, Upload } from "lucide-react";
-import { checkActiveSession } from "@/integrations/supabase/client";
+import { checkActiveSession, debugAuthStatus } from "@/integrations/supabase/client";
 
 const productSchema = z.object({
   name: z.string().min(3, "Product name must be at least 3 characters"),
@@ -53,10 +53,12 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
 
   useEffect(() => {
     const checkAuth = async () => {
-      const isActive = await checkActiveSession();
-      setIsAuthenticated(isActive);
+      console.log("Checking authentication status in ProductForm...");
+      const authStatus = await debugAuthStatus();
+      console.log("ProductForm auth check result:", authStatus);
+      setIsAuthenticated(authStatus.isAuthenticated);
       
-      if (!isActive) {
+      if (!authStatus.isAuthenticated) {
         toast({
           title: "Authentication Required",
           description: "You need to be logged in to add or edit products.",
@@ -102,7 +104,11 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
   });
 
   const handleSubmit = async (values: ProductFormValues) => {
-    if (!isAuthenticated) {
+    console.log("Submitting product form...");
+    
+    const isActive = await checkActiveSession();
+    if (!isActive) {
+      console.error("Authentication required to submit product form");
       toast({
         title: "Authentication Required",
         description: "You need to be logged in to add or edit products.",
@@ -203,9 +209,24 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     fileInputRef.current?.click();
   };
 
+  const renderAuthWarning = () => {
+    if (isAuthenticated === false) {
+      return (
+        <div className="bg-amber-50 border border-amber-200 p-3 rounded-md mb-4">
+          <p className="text-amber-800 font-medium">Authentication Required</p>
+          <p className="text-amber-700 text-sm">You are not currently authenticated with the database. 
+          Changes may not be saved. Please log out and log back in to reauthenticate.</p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        {renderAuthWarning()}
+        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
