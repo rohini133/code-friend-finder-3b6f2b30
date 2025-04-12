@@ -18,7 +18,17 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import Index from "./pages/Index";
 
-const queryClient = new QueryClient();
+// Create a new query client with proper configuration
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 30000,
+      // The onError property needs to be removed as it's not supported in the latest version
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

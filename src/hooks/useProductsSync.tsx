@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { supabase, debugAuthStatus, checkActiveSession } from '@/integrations/supabase/client';
+import { supabase, debugAuthStatus, checkActiveSession, enhancedLogin } from '@/integrations/supabase/client';
 import { Product } from '@/data/models';
 import { getProducts } from '@/services/productService';
 import { useToast } from '@/components/ui/use-toast';
@@ -15,16 +15,46 @@ export function useProductsSync() {
   // Check authentication status
   useEffect(() => {
     const checkAuth = async () => {
+      console.log("Checking authentication status...");
       const authStatus = await debugAuthStatus();
+      console.log("Authentication check result:", authStatus);
       setIsAuthenticated(authStatus.isAuthenticated);
       
       if (!authStatus.isAuthenticated) {
-        setError("Not authenticated. Please log in to view and modify products.");
+        console.warn("Not authenticated. Attempting automatic login for development...");
+        
+        try {
+          // For development - try to auto-login if not authenticated
+          // This is just for development convenience - should be removed in production
+          const result = await enhancedLogin(
+            'admin@example.com', 
+            'password123'
+          );
+          
+          if (result.success) {
+            console.log("Auto-login successful:", result);
+            setIsAuthenticated(true);
+            toast({
+              title: "Auto-login successful",
+              description: "Using default development credentials",
+            });
+          } else {
+            setError("Not authenticated. Please log in to view and modify products.");
+            toast({
+              title: "Authentication required",
+              description: "Please log in to access product data",
+              variant: "destructive",
+            });
+          }
+        } catch (e) {
+          console.error("Auto-login failed:", e);
+          setError("Not authenticated. Please log in to view and modify products.");
+        }
       }
     };
     
     checkAuth();
-  }, []);
+  }, [toast]);
 
   // Fetch initial products data
   useEffect(() => {
@@ -35,15 +65,21 @@ export function useProductsSync() {
         const authCheck = await checkActiveSession();
         console.log("Auth status before fetching products:", authCheck ? "Authenticated" : "Not authenticated");
         
+        if (!authCheck) {
+          throw new Error("Authentication required to fetch products");
+        }
+        
+        console.log("Fetching products from Supabase...");
         const data = await getProducts();
+        console.log("Products fetched successfully:", data.length);
         setProducts(data);
         setError(null);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching products:", err);
-        setError("Failed to load products");
+        setError(err.message || "Failed to load products");
         toast({
           title: "Error",
-          description: "Failed to load products. Please try again.",
+          description: err.message || "Failed to load products. Please try again.",
           variant: "destructive",
         });
       } finally {
@@ -51,18 +87,25 @@ export function useProductsSync() {
       }
     }
 
-    fetchProducts();
-  }, [toast]);
+    // Only fetch if authenticated
+    if (isAuthenticated) {
+      fetchProducts();
+    }
+  }, [toast, isAuthenticated]);
 
   // Setup real-time listeners for product changes
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    console.log("Setting up real-time product changes subscription");
+    
     // Set up the subscription to product changes
     const channel = supabase
       .channel('public:products')
       .on('postgres_changes', 
         { event: 'INSERT', schema: 'public', table: 'products' }, 
         (payload) => {
-          console.log('New product added:', payload);
+          console.log('New product added via realtime:', payload);
           // Map the new product to our Product type
           if (payload.new) {
             const newProduct: Product = {
@@ -94,7 +137,7 @@ export function useProductsSync() {
       .on('postgres_changes', 
         { event: 'UPDATE', schema: 'public', table: 'products' }, 
         (payload) => {
-          console.log('Product updated:', payload);
+          console.log('Product updated via realtime:', payload);
           if (payload.new) {
             const updatedProduct: Product = {
               id: payload.new.id,
@@ -122,7 +165,7 @@ export function useProductsSync() {
       .on('postgres_changes', 
         { event: 'DELETE', schema: 'public', table: 'products' }, 
         (payload) => {
-          console.log('Product deleted:', payload);
+          console.log('Product deleted via realtime:', payload);
           if (payload.old && payload.old.id) {
             setProducts(prev => prev.filter(p => p.id !== payload.old.id));
             
@@ -140,9 +183,10 @@ export function useProductsSync() {
 
     // Cleanup function to remove the subscription when component unmounts
     return () => {
+      console.log('Removing realtime subscription');
       supabase.removeChannel(channel);
     };
-  }, [toast]);
+  }, [toast, isAuthenticated]);
 
   return { products, isLoading, error, isAuthenticated };
 }

@@ -2,32 +2,36 @@
 import { Product } from "@/types/supabase-extensions";
 import { sampleProducts } from "@/data/sampleData";
 
-// Local store for product data as fallback
-let products = [...sampleProducts];
+// This file has been deprecated - we've removed all local storage functionality
+// to ensure that all data is saved directly to Supabase.
+// These methods have been kept for backwards compatibility but will log warnings.
 
 export const getLocalProducts = (): Product[] => {
-  return [...products];
+  console.warn("DEPRECATED: getLocalProducts() - Local storage is disabled. Please use Supabase directly.");
+  return [];
 };
 
 export const getLocalProductById = (id: string): Product | undefined => {
-  return products.find(product => product.id === id);
+  console.warn("DEPRECATED: getLocalProductById() - Local storage is disabled. Please use Supabase directly.");
+  return undefined;
 };
 
 export const updateLocalProductStore = (updatedProducts: Product[]): void => {
-  products = updatedProducts;
+  console.warn("DEPRECATED: updateLocalProductStore() - Local storage is disabled. Please use Supabase directly.");
+  // No-op
 };
 
 export const addProductToLocalStore = (product: Product): void => {
-  products.push(product);
+  console.warn("DEPRECATED: addProductToLocalStore() - Local storage is disabled. Please use Supabase directly.");
+  // No-op
 };
 
 export const updateProductInLocalStore = (updatedProduct: Product): void => {
-  const index = products.findIndex(p => p.id === updatedProduct.id);
-  if (index !== -1) {
-    products[index] = updatedProduct;
-  }
+  console.warn("DEPRECATED: updateProductInLocalStore() - Local storage is disabled. Please use Supabase directly.");
+  // No-op
 };
 
 export const removeProductFromLocalStore = (productId: string): void => {
-  products = products.filter(p => p.id !== productId);
+  console.warn("DEPRECATED: removeProductFromLocalStore() - Local storage is disabled. Please use Supabase directly.");
+  // No-op
 };

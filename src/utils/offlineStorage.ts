@@ -1,109 +1,50 @@
-
 /**
  * Utility for managing offline data storage
- * This serves as an alternative to Supabase when working in offline mode
+ * DEPRECATED: All methods now log warnings and do not perform local storage operations
  */
 
-// Initialize localStorage if it doesn't exist
-const initializeStore = (storeName: string) => {
-  if (!localStorage.getItem(storeName)) {
-    localStorage.setItem(storeName, JSON.stringify([]));
-  }
-};
-
-// Generic get function
+// Generic get function - now returns empty arrays
 export const getItems = <T>(storeName: string): T[] => {
-  initializeStore(storeName);
-  const data = localStorage.getItem(storeName);
-  return data ? JSON.parse(data) : [];
+  console.warn(`DEPRECATED: getItems(${storeName}) - Offline mode is disabled. Please use Supabase directly.`);
+  return [];
 };
 
-// Generic add function
+// Generic add function - now returns a mock item with warning
 export const addItem = <T>(storeName: string, item: T): T => {
-  const items = getItems<T>(storeName);
-  const newItem = {
+  console.warn(`DEPRECATED: addItem(${storeName}) - Offline mode is disabled. Please use Supabase directly.`);
+  console.warn('Not saving item locally:', item);
+  return {
     ...item,
-    id: crypto.randomUUID(), // Generate a random UUID
-    createdAt: new Date().toISOString(),
-  };
-  
-  items.push(newItem);
-  localStorage.setItem(storeName, JSON.stringify(items));
-  return newItem;
+    id: 'offline-mode-disabled',
+  } as T;
 };
 
-// Generic update function
+// Generic update function - now returns the item unchanged with warning
 export const updateItem = <T extends { id: string }>(storeName: string, item: T): T => {
-  const items = getItems<T>(storeName);
-  const index = items.findIndex(i => (i as any).id === item.id);
-  
-  if (index !== -1) {
-    items[index] = {
-      ...item,
-      updatedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(storeName, JSON.stringify(items));
-  }
-  
+  console.warn(`DEPRECATED: updateItem(${storeName}) - Offline mode is disabled. Please use Supabase directly.`);
+  console.warn('Not updating item locally:', item);
   return item;
 };
 
-// Generic delete function
+// Generic delete function - now returns false with warning
 export const deleteItem = <T extends { id: string }>(storeName: string, id: string): boolean => {
-  const items = getItems<T>(storeName);
-  const filteredItems = items.filter(item => (item as any).id !== id);
-  
-  if (filteredItems.length !== items.length) {
-    localStorage.setItem(storeName, JSON.stringify(filteredItems));
-    return true;
-  }
-  
+  console.warn(`DEPRECATED: deleteItem(${storeName}, ${id}) - Offline mode is disabled. Please use Supabase directly.`);
   return false;
 };
 
-// Data backup function
+// Data backup function - now returns empty JSON
 export const backupData = (): string => {
-  const backup: Record<string, any> = {};
-  
-  // Get all data from localStorage
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key) {
-      const value = localStorage.getItem(key);
-      if (value) {
-        backup[key] = JSON.parse(value);
-      }
-    }
-  }
-  
-  // Create downloadable JSON blob
-  const dataStr = JSON.stringify(backup);
-  const downloadJson = `data:text/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
-  
-  return downloadJson;
+  console.warn('DEPRECATED: backupData() - Offline mode is disabled. Please use Supabase directly.');
+  return 'data:text/json;charset=utf-8,{}';
 };
 
-// Data restore function
+// Data restore function - now returns false with warning
 export const restoreData = (jsonData: string): boolean => {
-  try {
-    const data = JSON.parse(jsonData);
-    
-    // Clear existing data
-    localStorage.clear();
-    
-    // Restore data
-    Object.keys(data).forEach(key => {
-      localStorage.setItem(key, JSON.stringify(data[key]));
-    });
-    
-    return true;
-  } catch (error) {
-    console.error("Error restoring data:", error);
-    return false;
-  }
+  console.warn('DEPRECATED: restoreData() - Offline mode is disabled. Please use Supabase directly.');
+  return false;
 };
 
-// Export store names to ensure consistency across the app
+// Export store names for backward compatibility
 export const STORE_NAMES = {
   PRODUCTS: "demo_products",
   BILLS: "demo_bills",
@@ -112,38 +53,25 @@ export const STORE_NAMES = {
   SETTINGS: "demo_settings",
 };
 
-// Initialize default settings
+// Initialize default settings - now a no-op
 export const initializeSettings = () => {
-  const settings = localStorage.getItem(STORE_NAMES.SETTINGS);
-  
-  if (!settings) {
-    const defaultSettings = {
-      offlineMode: true,
-      autoPrint: true,
-      currency: "INR",
-      currencySymbol: "₹ ",
-      businessName: "Demo",
-      businessAddress: "123 Main Street, Bangalore, India",
-      businessPhone: "+91 9876543210",
-      businessEmail: "contact@demolocalstore.com",
-      taxRate: 18, // GST rate
-    };
-    
-    localStorage.setItem(STORE_NAMES.SETTINGS, JSON.stringify(defaultSettings));
-  }
+  console.warn('DEPRECATED: initializeSettings() - Offline mode is disabled. Please use Supabase directly.');
 };
 
-// Get application settings
+// Get application settings - now returns empty object
 export const getSettings = (): Record<string, any> => {
-  initializeSettings();
-  const settings = localStorage.getItem(STORE_NAMES.SETTINGS);
-  return settings ? JSON.parse(settings) : {};
+  console.warn('DEPRECATED: getSettings() - Offline mode is disabled. Please use Supabase directly.');
+  return {
+    offlineMode: false,
+    businessName: "Vivaas",
+    businessAddress: "Shiv Park Phase 2 Shop No-6-7 Pune Solapur Road Lakshumi Colony Opposite HDFC Bank Near Angle School, Pune-412307",
+    businessPhone: "+91 9657171777, +91 9765971717",
+    businessEmail: "contact@vivaas.store",
+  };
 };
 
-// Update application settings
+// Update application settings - now a no-op
 export const updateSettings = (newSettings: Record<string, any>): Record<string, any> => {
-  const currentSettings = getSettings();
-  const updatedSettings = { ...currentSettings, ...newSettings };
-  localStorage.setItem(STORE_NAMES.SETTINGS, JSON.stringify(updatedSettings));
-  return updatedSettings;
+  console.warn('DEPRECATED: updateSettings() - Offline mode is disabled. Please use Supabase directly.');
+  return newSettings;
 };

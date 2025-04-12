@@ -1,5 +1,4 @@
-
-import { useState, useRef, ChangeEvent } from "react";
+import { useState, useRef, ChangeEvent, useEffect } from "react";
 import { Product } from "@/data/models";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,19 +12,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/components/ui/use-toast";
 import { addProduct, updateProduct } from "@/services/productService";
-import { Loader2, Upload, Image as ImageIcon } from "lucide-react";
+import { Loader2, Upload } from "lucide-react";
+import { checkActiveSession } from "@/integrations/supabase/client";
 
 const productSchema = z.object({
   name: z.string().min(3, "Product name must be at least 3 characters"),
@@ -56,6 +49,24 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const isEditing = !!product;
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const isActive = await checkActiveSession();
+      setIsAuthenticated(isActive);
+      
+      if (!isActive) {
+        toast({
+          title: "Authentication Required",
+          description: "You need to be logged in to add or edit products.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    checkAuth();
+  }, [toast]);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -91,20 +102,38 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
   });
 
   const handleSubmit = async (values: ProductFormValues) => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "You need to be logged in to add or edit products.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
+      console.log(`Submitting ${isEditing ? 'update' : 'new'} product to Supabase:`, values);
+      
       if (isEditing && product) {
+        console.log("Updating product in Supabase:", {
+          id: product.id,
+          ...values
+        });
+        
         await updateProduct({
           ...product,
           ...values,
           updatedAt: new Date().toISOString()
         });
+        
         toast({
           title: "Product updated",
           description: `${values.name} has been updated successfully.`,
         });
       } else {
-        // Fix: Ensure all required fields are explicitly provided
+        console.log("Adding new product to Supabase:", values);
+        
         await addProduct({
           name: values.name,
           brand: values.brand,
@@ -119,16 +148,19 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           color: values.color,
           itemNumber: values.itemNumber,
         });
+        
         toast({
           title: "Product added",
           description: `${values.name} has been added successfully.`,
         });
       }
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
+      console.error(`Error ${isEditing ? 'updating' : 'adding'} product:`, error);
+      
       toast({
         title: isEditing ? "Update failed" : "Add failed",
-        description: `Failed to ${isEditing ? 'update' : 'add'} product. Please try again.`,
+        description: error.message || `Failed to ${isEditing ? 'update' : 'add'} product. Please try again.`,
         variant: "destructive",
       });
     } finally {
@@ -140,7 +172,6 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast({
         title: "File too large",
@@ -150,7 +181,6 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
       return;
     }
 
-    // Check file type
     if (!file.type.startsWith('image/')) {
       toast({
         title: "Invalid file type",
@@ -160,7 +190,6 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
       return;
     }
 
-    // Convert to base64 for preview and storage
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
