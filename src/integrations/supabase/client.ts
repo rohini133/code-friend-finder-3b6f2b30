@@ -11,7 +11,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    storageKey: 'vivaas-auth-token', // Changed from 'vivaas-auth-token' to be consistent
+    storageKey: 'vivaas-auth-token',
   },
   global: {
     headers: {

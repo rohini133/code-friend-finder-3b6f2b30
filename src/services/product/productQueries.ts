@@ -37,8 +37,6 @@ export const getProducts = async (): Promise<Product[]> => {
         }
       }
       
-      // Return empty array instead of falling back to local data
-      console.error("Failed to fetch products and no fallback available");
       throw new Error(`Database error: ${error.message}`);
     }
     
@@ -50,7 +48,7 @@ export const getProducts = async (): Promise<Product[]> => {
     }
     
     console.log("No products found in database");
-    return []; // Return empty array instead of sample data
+    return []; // Return empty array
   } catch (e) {
     console.error("Error in getProducts:", e);
     throw e; // Re-throw to be handled by the caller

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageContainer } from "@/components/layout/PageContainer";
@@ -14,12 +13,13 @@ import { useAuth } from "@/contexts/AuthContext";
 const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login } = useAuth();
+  const auth = useAuth();
+  const login = auth?.login || (async () => false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async (role: string) => {
+  const handleLogin = async () => {
     setIsLoading(true);
     
     if (!username || !password) {
@@ -53,7 +53,6 @@ const Login = () => {
       <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
         <div className="w-full max-w-6xl login-container overflow-hidden">
           <div className="grid md:grid-cols-5 min-h-[550px]">
-            {/* Left sidebar with branding */}
             <div className="login-sidebar md:col-span-2 p-8 flex flex-col justify-between">
               <div>
                 <div className="flex items-center mb-6">
@@ -108,7 +107,6 @@ const Login = () => {
               </div>
             </div>
             
-            {/* Right side with login form */}
             <div className="login-form md:col-span-3 p-8">
               <div className="max-w-md mx-auto">
                 <div className="text-center mb-8">
@@ -180,7 +178,7 @@ const Login = () => {
                       <CardFooter>
                         <Button 
                           className="w-full amazon-button"
-                          onClick={() => handleLogin("admin")}
+                          onClick={handleLogin}
                           disabled={isLoading}
                         >
                           {isLoading ? "Signing in..." : "Sign In"}
@@ -237,7 +235,7 @@ const Login = () => {
                       <CardFooter>
                         <Button 
                           className="w-full flipkart-button" 
-                          onClick={() => handleLogin("cashier")}
+                          onClick={handleLogin}
                           disabled={isLoading}
                         >
                           {isLoading ? "Signing in..." : "Sign In"}
