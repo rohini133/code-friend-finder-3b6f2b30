@@ -7,18 +7,18 @@ import { supabase, enhancedLogin, debugAuthStatus } from "@/integrations/supabas
 // Define fixed users for the system
 const USERS = [
   {
-    username: "rohini25",
-    password: "Rohini@123",
+    username: "owner",
+    password: "owner@123",
     role: "admin",
-    name: "Rohini Satale",
-    email: "rohini25@example.com"
+    name: "Owner",
+    email: "owner@vivaas.com"
   },
   {
-    username: "balaji12",
-    password: "Balaji@25",
+    username: "cashier",
+    password: "cashier@123",
     role: "cashier",
-    name: "Balaji Wagh",
-    email: "balaji12@example.com"
+    name: "Cashier",
+    email: "cashier@vivaas.com"
   }
 ];
 

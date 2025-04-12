@@ -1,14 +1,15 @@
+
 import { BillWithItems } from "@/data/models";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 // Constants for shop information
-const SHOP_NAME = "Vivaas";
-const SHOP_ADDRESS_LINE1 = "Shiv Park Phase 2 Shop No-6-7 Pune Solapur Road";
-const SHOP_ADDRESS_LINE2 = "Lakshumi Colony Opposite HDFC Bank Near Angle School, Pune-412307";
-const SHOP_CONTACT = "9657171777 || 9765971717";
-const SHOP_GSTIN = "27AHDPS0010G1ZU"; // Replace with actual GSTIN if available
-const SHOP_LOGO = "public/lovable-uploads/4074e4b6-df93-42f1-9e94-22828d9dfb57.png"; // Path to the uploaded logo
+const SHOP_NAME = "Vivaa's";
+const SHOP_ADDRESS_LINE1 = "804, Ravivar Peth, Kapad Ganj";
+const SHOP_ADDRESS_LINE2 = "Opp. Shani Mandir, Pune - 411002";
+const SHOP_CONTACT = "9890669994/9307060539";
+const SHOP_GSTIN = "27AFIFS6956E1ZJ"; // Updated GSTIN as per Shanti Agency
+const SHOP_LOGO = "public/lovable-uploads/3ea4f499-fcd3-4858-9d48-f45847e83e52.png"; // Path to the uploaded eagle logo
 
 export const generatePDF = (bill: BillWithItems): Blob => {
   console.log("Generating PDF for bill:", bill);
@@ -19,185 +20,209 @@ export const generatePDF = (bill: BillWithItems): Blob => {
   }
   
   try {
-    // Create a new jsPDF instance
-    const doc = new jsPDF();
+    // Create a new jsPDF instance with smaller page size to match receipt style
+    const doc = new jsPDF({
+      format: 'a7',
+      unit: 'mm'
+    });
     
-    // Add logo
+    // Set smaller margins
+    const margin = 5;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const contentWidth = pageWidth - (margin * 2);
+    
+    // Add logo - using a smaller size for the compact receipt
     try {
-      doc.addImage(SHOP_LOGO, 'PNG', doc.internal.pageSize.getWidth() / 2 - 20, 10, 40, 20, undefined, 'FAST');
+      doc.addImage(SHOP_LOGO, 'PNG', (pageWidth / 2) - 10, margin, 20, 12, undefined, 'FAST');
     } catch (logoError) {
       console.error("Could not add logo:", logoError);
     }
     
-    // Add Vivaas shop information
-    const headerY = 35; // Starting Y position after logo
+    // Add shop name and information
+    const headerY = margin + 15; // Starting Y position after logo
+    let currentY = headerY;
     
-    // Set font sizes
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text(SHOP_NAME, doc.internal.pageSize.getWidth() / 2, headerY, { align: "center" });
-    
+    // Set shop name
     doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(SHOP_NAME, pageWidth / 2, currentY, { align: "center" });
+    currentY += 4;
+    
+    // Shop address and contact
+    doc.setFontSize(6);
     doc.setFont("helvetica", "normal");
-    doc.text(SHOP_ADDRESS_LINE1, doc.internal.pageSize.getWidth() / 2, headerY + 7, { align: "center" });
-    doc.text(SHOP_ADDRESS_LINE2, doc.internal.pageSize.getWidth() / 2, headerY + 12, { align: "center" });
-    doc.text(SHOP_CONTACT, doc.internal.pageSize.getWidth() / 2, headerY + 17, { align: "center" });
-    doc.text(`GSTIN : ${SHOP_GSTIN}`, doc.internal.pageSize.getWidth() / 2, headerY + 22, { align: "center" });
+    doc.text(SHOP_ADDRESS_LINE1, pageWidth / 2, currentY, { align: "center" });
+    currentY += 3;
+    doc.text(SHOP_ADDRESS_LINE2, pageWidth / 2, currentY, { align: "center" });
+    currentY += 3;
+    doc.text(`MOB No. ${SHOP_CONTACT}`, pageWidth / 2, currentY, { align: "center" });
+    currentY += 3;
+    doc.text(`GSTIN : ${SHOP_GSTIN}`, pageWidth / 2, currentY, { align: "center" });
+    currentY += 3;
+    
+    // Add horizontal line
+    doc.setLineWidth(0.1);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 3;
+    
+    // Add bill information (Bill No, Date, Counter, Time)
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "bold");
+    
+    // Create two columns for bill info
+    doc.text(`Bill No : ${bill.id}`, margin, currentY);
+    doc.text(`Date : ${new Date(bill.createdAt).toLocaleDateString()}`, pageWidth - margin, currentY, { align: "right" });
+    currentY += 3;
+    
+    doc.text(`Counter No : 1`, margin, currentY);
+    doc.text(`Time : ${new Date(bill.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`, pageWidth - margin, currentY, { align: "right" });
+    currentY += 2;
     
     // Add a separator line
-    doc.setLineWidth(0.5);
-    doc.line(14, headerY + 25, doc.internal.pageSize.getWidth() - 14, headerY + 25);
+    doc.setLineWidth(0.1);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 3;
     
-    // Add receipt information
-    const receiptInfoY = headerY + 30;
-    doc.setFontSize(11);
-    doc.text(`Bill No : ${bill.id}`, 14, receiptInfoY);
-    doc.text(`Date : ${new Date(bill.createdAt).toLocaleDateString()}`, doc.internal.pageSize.getWidth() - 14, receiptInfoY, { align: "right" });
+    // Add header for table columns
+    doc.setFontSize(6);
+    doc.text("Particulars", margin, currentY);
+    doc.text("Qty", margin + 35, currentY, { align: "center" });
+    doc.text("MRP", margin + 45, currentY, { align: "center" });
+    doc.text("SSP", margin + 55, currentY, { align: "center" });
+    doc.text("Tot.Amount", pageWidth - margin, currentY, { align: "right" });
+    currentY += 2;
     
-    doc.text(`Counter No : 1`, 14, receiptInfoY + 5);
-    doc.text(`Time : ${new Date(bill.createdAt).toLocaleTimeString()}`, doc.internal.pageSize.getWidth() - 14, receiptInfoY + 5, { align: "right" });
+    // Add a separator line
+    doc.setLineWidth(0.1);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 3;
     
-    // Add customer information if available
-    let startY = receiptInfoY + 10;
-    if (bill.customerName || bill.customerPhone || bill.customerEmail) {
-      doc.text("Customer:", 14, startY);
-      startY += 5;
-      
-      if (bill.customerName) {
-        doc.text(`Name: ${bill.customerName}`, 14, startY);
-        startY += 5;
-      }
-      
-      if (bill.customerPhone) {
-        doc.text(`Phone: ${bill.customerPhone}`, 14, startY);
-        startY += 5;
-      }
-      
-      if (bill.customerEmail) {
-        doc.text(`Email: ${bill.customerEmail}`, 14, startY);
-        startY += 5;
-      }
-      
-      startY += 5;
-    }
-    
-    // Create items table with MRP and SSP columns as in the reference
+    // Add items - manual rendering instead of autoTable for more control
     const hasItems = bill.items && bill.items.length > 0;
     
     if (hasItems) {
-      const tableData = bill.items.map(item => {
+      bill.items.forEach(item => {
         const productName = item.productName || (item.product ? item.product.name : "Unknown Product");
         const productPrice = item.productPrice || (item.product ? item.product.price : 0);
         const discountPercentage = item.discountPercentage || (item.product ? item.product.discountPercentage : 0);
         const ssp = productPrice * (1 - discountPercentage / 100);
         const mrp = productPrice;
         
-        return [
-          productName,
-          item.quantity.toString(),
-          formatCurrency(mrp, false),
-          formatCurrency(ssp, false),
-          formatCurrency(item.total, false)
-        ];
-      });
-      
-      autoTable(doc, {
-        startY: startY,
-        head: [["Particulars", "Qty", "MRP", "SSP", "Tot.Amount"]],
-        body: tableData,
-        theme: 'striped',
-        headStyles: { fillColor: [100, 100, 100] },
-        styles: { fontSize: 9 },
-        columnStyles: {
-          0: { cellWidth: 60 },
-          1: { cellWidth: 20, halign: 'center' },
-          2: { cellWidth: 25, halign: 'right' },
-          3: { cellWidth: 25, halign: 'right' },
-          4: { cellWidth: 30, halign: 'right' }
-        }
+        doc.setFont("helvetica", "normal");
+        doc.text(productName.toUpperCase(), margin, currentY);
+        doc.text(item.quantity.toString(), margin + 35, currentY, { align: "center" });
+        doc.text(formatCurrency(mrp, false), margin + 45, currentY, { align: "center" });
+        doc.text(formatCurrency(ssp, false), margin + 55, currentY, { align: "center" });
+        doc.text(formatCurrency(item.total, false), pageWidth - margin, currentY, { align: "right" });
+        
+        currentY += 3;
       });
     } else {
-      doc.text("No items in this bill", doc.internal.pageSize.getWidth() / 2, startY + 10, { align: "center" });
+      doc.text("No items in this bill", pageWidth / 2, currentY, { align: "center" });
+      currentY += 3;
     }
     
-    // Get the Y position after the table
-    const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 10 : startY + 20;
+    // Add a separator line
+    doc.setLineWidth(0.1);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 3;
     
-    // Calculate totals for MRP, savings and net amount
+    // Calculate totals
     const totalMRP = bill.items ? bill.items.reduce((sum, item) => {
       const productPrice = item.productPrice || (item.product ? item.product.price : 0);
       return sum + (productPrice * item.quantity);
     }, 0) : 0;
     
+    const totalQty = bill.items ? bill.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
     const savings = totalMRP - bill.subtotal;
     
-    // Add Quantity total and Total MRP line
+    // Add quantity and MRP totals
     doc.setFont("helvetica", "bold");
-    doc.text(`Qty:`, 14, finalY);
-    doc.text(`${bill.items?.reduce((sum, item) => sum + item.quantity, 0)}`, 30, finalY);
-    doc.text(`Total MRP:`, 100, finalY);
-    doc.text(`${formatCurrency(totalMRP, false)}`, doc.internal.pageSize.getWidth() - 14, finalY, { align: "right" });
+    doc.text(`Qty: ${totalQty}`, margin, currentY);
+    doc.text(`Total MRP: ${formatCurrency(totalMRP, false)}`, pageWidth - margin, currentY, { align: "right" });
+    currentY += 3;
     
-    // Add savings line
-    doc.text(`Your Saving :`, 14, finalY + 7);
-    doc.text(`${formatCurrency(savings, false)}`, doc.internal.pageSize.getWidth() - 14, finalY + 7, { align: "right" });
+    // Add savings
+    doc.text(`Your Saving :`, margin, currentY);
+    doc.text(`${formatCurrency(savings, false)}`, pageWidth - margin, currentY, { align: "right" });
+    currentY += 3;
     
-    // Add total line
-    doc.text(`Total :`, 14, finalY + 14);
-    doc.text(`${formatCurrency(bill.total, false)}`, doc.internal.pageSize.getWidth() - 14, finalY + 14, { align: "right" });
+    // Add total
+    doc.text(`Total :`, margin, currentY);
+    doc.text(`${formatCurrency(bill.total, false)}`, pageWidth - margin, currentY, { align: "right" });
+    currentY += 3;
     
     // Add GST summary box
-    const gstY = finalY + 20;
-    doc.rect(14, gstY, doc.internal.pageSize.getWidth() - 28, 30);
+    doc.setLineWidth(0.1);
+    doc.rect(margin, currentY, contentWidth, 12);
+    currentY += 3;
     
     // Add GST summary header
-    doc.text("GST Summary :", 18, gstY + 6);
+    doc.setFontSize(6);
+    doc.text("GST Summary :", margin + 2, currentY);
+    currentY += 2;
     
-    // Add GST table headers
+    // Add line inside GST box
+    doc.setLineWidth(0.1);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 2;
+    
+    // GST table headers
     doc.setFont("helvetica", "normal");
-    doc.text("Description", 18, gstY + 12);
-    doc.text("Taxable", 70, gstY + 12);
-    doc.text("CGST", 110, gstY + 12);
-    doc.text("SGST", 150, gstY + 12);
+    doc.text("Description", margin + 2, currentY);
+    doc.text("Taxable", margin + 25, currentY);
+    doc.text("CGST", margin + 40, currentY);
+    doc.text("SGST", margin + 50, currentY);
+    currentY += 2;
     
     // Calculate GST amounts - assuming 18% GST (9% CGST + 9% SGST)
     const taxableAmount = bill.subtotal;
-    const cgst = bill.tax / 2; // Assuming tax is already split for CGST+SGST
+    const cgst = bill.tax / 2;
     const sgst = bill.tax / 2;
     
-    // Add GST details row - splitting into 9% CGST and 9% SGST
-    doc.text("GST 18.00%", 18, gstY + 18);
-    doc.text(formatCurrency(taxableAmount, false), 70, gstY + 18);
-    doc.text(formatCurrency(cgst, false), 110, gstY + 18);
-    doc.text(formatCurrency(sgst, false), 150, gstY + 18);
+    // GST details
+    doc.text("GST 18.00%", margin + 2, currentY);
+    doc.text(formatCurrency(taxableAmount, false), margin + 25, currentY);
+    doc.text(formatCurrency(cgst, false), margin + 40, currentY);
+    doc.text(formatCurrency(sgst, false), margin + 50, currentY);
+    currentY += 2;
     
-    // Add GST table totals
+    // Line before the totals
+    doc.setLineWidth(0.1);
+    doc.line(margin, currentY, pageWidth - margin, currentY);
+    currentY += 2;
+    
+    // GST table totals
     doc.setFont("helvetica", "bold");
-    doc.text(formatCurrency(taxableAmount, false), 70, gstY + 24);
-    doc.text(formatCurrency(cgst, false), 110, gstY + 24);
-    doc.text(formatCurrency(sgst, false), 150, gstY + 24);
+    doc.text(formatCurrency(taxableAmount, false), margin + 25, currentY);
+    doc.text(formatCurrency(cgst, false), margin + 40, currentY);
+    doc.text(formatCurrency(sgst, false), margin + 50, currentY);
+    currentY += 3;
     
     // Add Net Amount line
-    const netAmountY = gstY + 35;
-    doc.setFont("helvetica", "bold");
-    doc.text(`Net Amount : `, 14, netAmountY);
-    doc.text(`₹ ${formatCurrency(bill.total, false)}`, doc.internal.pageSize.getWidth() - 14, netAmountY, { align: "right" });
+    doc.text(`Net Amount :`, margin, currentY + 3);
+    doc.text(`₹ ${formatCurrency(bill.total, false)}`, pageWidth - margin, currentY + 3, { align: "right" });
+    currentY += 6;
     
     // Add payment details
-    const paymentY = netAmountY + 7;
     doc.setFont("helvetica", "normal");
-    doc.text(`${getPaymentMethodName(bill.paymentMethod)} : ${formatCurrency(bill.total, false)}`, 14, paymentY);
-    doc.text(`${getPaymentMethodName(bill.paymentMethod)} Date : ${new Date(bill.createdAt).toLocaleDateString()}`, doc.internal.pageSize.getWidth() / 2 + 10, paymentY);
+    doc.text(`${getPaymentMethodName(bill.paymentMethod)} : ${formatCurrency(bill.total, false)}`, margin, currentY);
+    doc.text(`${getPaymentMethodName(bill.paymentMethod)} Date : ${new Date(bill.createdAt).toLocaleDateString()}`, pageWidth / 2, currentY);
+    currentY += 3;
     
     // Add UPI details
-    doc.text(`UPI No. 0`, 14, paymentY + 7);
-    doc.text(`Bank : `, doc.internal.pageSize.getWidth() / 2 + 10, paymentY + 7);
+    doc.text(`UPI No. 0`, margin, currentY);
+    doc.text(`Bank :`, pageWidth / 2, currentY);
+    currentY += 5;
     
-    // Add thank you message
-    const thankYouY = paymentY + 14;
-    doc.text("Thank you for shopping with us", doc.internal.pageSize.getWidth() / 2, thankYouY, { align: "center" });
-    doc.text("Please visit again..!", doc.internal.pageSize.getWidth() / 2, thankYouY + 5, { align: "center" });
-    doc.text("*** Have A Nice Day ***", doc.internal.pageSize.getWidth() / 2, thankYouY + 10, { align: "center" });
+    // Thank you message
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    doc.text("Thank you for shopping with us", pageWidth / 2, currentY, { align: "center" });
+    currentY += 2;
+    doc.text("Please visit again..!", pageWidth / 2, currentY, { align: "center" });
+    currentY += 2;
+    doc.text("*** Have A Nice Day ***", pageWidth / 2, currentY, { align: "center" });
     
     // Generate PDF blob
     const pdfBlob = doc.output('blob');

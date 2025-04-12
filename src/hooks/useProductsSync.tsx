@@ -24,6 +24,8 @@ export const useProductsSync = () => {
   }, []);
   
   // Use React Query to fetch products
+  // Note: We're not blocking data fetching based on authentication
+  // since we have a fallback to sample data in getProducts
   const { 
     data: products = [], 
     isLoading, 

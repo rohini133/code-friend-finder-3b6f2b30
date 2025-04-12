@@ -174,7 +174,7 @@ export const BillReceipt = ({ bill }: BillReceiptProps) => {
     <Card className="h-full flex flex-col">
       <CardHeader>
         <CardTitle className="flex justify-between items-center">
-          <span>Vivaas Receipt</span>
+          <span>Vivaa's Receipt</span>
           <div className="text-sm font-normal text-gray-500">Bill #{bill.id}</div>
         </CardTitle>
       </CardHeader>
@@ -182,14 +182,15 @@ export const BillReceipt = ({ bill }: BillReceiptProps) => {
       <CardContent className="flex-grow overflow-auto">
         <div ref={receiptRef} className="text-center">
           <img 
-            src="public/lovable-uploads/4074e4b6-df93-42f1-9e94-22828d9dfb57.png" 
-            alt="Vivaas Logo" 
+            src="public/lovable-uploads/3ea4f499-fcd3-4858-9d48-f45847e83e52.png" 
+            alt="Vivaa's Logo" 
             className="h-16 mx-auto mb-2"
           />
-          <div className="text-xl font-bold">Vivaas</div>
-          <div className="text-sm text-gray-600">Shiv Park Phase 2 Shop No-6-7 Pune Solapur Road</div>
-          <div className="text-sm text-gray-600">Lakshumi Colony Opposite HDFC Bank Near Angle School, Pune-412307</div>
-          <div className="text-sm text-gray-600">9657171777 || 9765971717</div>
+          <div className="text-xl font-bold">Vivaa's</div>
+          <div className="text-sm text-gray-600">804, Ravivar Peth, Kapad Ganj</div>
+          <div className="text-sm text-gray-600">Opp. Shani Mandir, Pune - 411002</div>
+          <div className="text-sm text-gray-600">9890669994/9307060539</div>
+          <div className="text-sm text-gray-600">GSTIN: 27AFIFS6956E1ZJ</div>
           
           <div className="border-t border-dashed border-gray-300 my-3"></div>
 
@@ -200,7 +201,7 @@ export const BillReceipt = ({ bill }: BillReceiptProps) => {
             </div>
             <div className="flex justify-between">
               <div><strong>Counter:</strong> 1</div>
-              <div><strong>Time:</strong> {new Date(bill.createdAt).toLocaleTimeString()}</div>
+              <div><strong>Time:</strong> {new Date(bill.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
             </div>
           </div>
 
@@ -229,7 +230,7 @@ export const BillReceipt = ({ bill }: BillReceiptProps) => {
                 
                 return (
                   <tr key={index} className="border-b border-gray-100">
-                    <td className="py-1">{item.product.name}</td>
+                    <td className="py-1">{item.product.name.toUpperCase()}</td>
                     <td className="text-center py-1">{item.quantity}</td>
                     <td className="text-right py-1">{formatCurrency(mrp)}</td>
                     <td className="text-right py-1">{formatCurrency(ssp)}</td>
@@ -241,7 +242,7 @@ export const BillReceipt = ({ bill }: BillReceiptProps) => {
           </table>
 
           <div className="text-left text-sm">
-            <div className="flex justify-between py-1">
+            <div className="flex justify-between py-1 border-t border-gray-200">
               <span><strong>Qty:</strong> {bill.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}</span>
               <span><strong>Total MRP:</strong> {formatCurrency(bill.items?.reduce((sum, item) => sum + (item.product.price * item.quantity), 0) || 0)}</span>
             </div>
