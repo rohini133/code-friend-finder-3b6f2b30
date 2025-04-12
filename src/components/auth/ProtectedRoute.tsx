@@ -9,7 +9,12 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children, requiredRole, restrictedRoles = [] }: ProtectedRouteProps) => {
-  const { isLoggedIn, checkAuthAccess, userRole } = useAuth();
+  const auth = useAuth();
+  
+  // Use the values from auth, or defaults if auth context is not available
+  const isLoggedIn = auth?.isLoggedIn || false;
+  const userRole = auth?.userRole || null;
+  const checkAuthAccess = auth?.checkAuthAccess || (() => false);
 
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />;
