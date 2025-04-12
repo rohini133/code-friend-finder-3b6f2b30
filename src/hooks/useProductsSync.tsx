@@ -1,172 +1,46 @@
 
-import { useEffect, useState } from 'react';
-import { supabase, debugAuthStatus, checkActiveSession } from '@/integrations/supabase/client';
-import { Product } from '@/data/models';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Product } from '@/types/supabase-extensions';
 import { getProducts } from '@/services/productService';
-import { useToast } from '@/components/ui/use-toast';
+import { checkActiveSession } from '@/integrations/supabase/client';
 
-export function useProductsSync() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast();
+export const useProductsSync = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-
-  // Check authentication status
+  
+  // Check auth status on component mount
   useEffect(() => {
     const checkAuth = async () => {
-      console.log("Checking authentication status...");
-      const authStatus = await debugAuthStatus();
-      console.log("Authentication check result:", authStatus);
-      setIsAuthenticated(authStatus.isAuthenticated);
-      
-      if (!authStatus.isAuthenticated) {
-        setError("Not authenticated. Please log in to view and modify products.");
-        toast({
-          title: "Authentication Required",
-          description: "Please log in to access product data",
-          variant: "destructive",
-        });
+      try {
+        const hasSession = await checkActiveSession();
+        setIsAuthenticated(hasSession);
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+        setIsAuthenticated(false);
       }
     };
     
     checkAuth();
-  }, [toast]);
-
-  // Fetch initial products data
-  useEffect(() => {
-    async function fetchProducts() {
-      setIsLoading(true);
-      try {
-        // Log authentication status before fetching
-        const authCheck = await checkActiveSession();
-        console.log("Auth status before fetching products:", authCheck ? "Authenticated" : "Not authenticated");
-        
-        if (!authCheck) {
-          throw new Error("Authentication required to fetch products");
-        }
-        
-        console.log("Fetching products from Supabase...");
-        const data = await getProducts();
-        console.log("Products fetched successfully:", data.length);
-        setProducts(data);
-        setError(null);
-      } catch (err: any) {
-        console.error("Error fetching products:", err);
-        setError(err.message || "Failed to load products");
-        toast({
-          title: "Error",
-          description: err.message || "Failed to load products. Please try again.",
-          variant: "destructive",
-        });
-        // Don't set products to empty array here to preserve any previously loaded data
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    // Only fetch if authenticated
-    if (isAuthenticated) {
-      fetchProducts();
-    } else {
-      setIsLoading(false); // Stop loading state if not authenticated
-    }
-  }, [toast, isAuthenticated]);
-
-  // Setup real-time listeners for product changes
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    
-    console.log("Setting up real-time product changes subscription");
-    
-    // Set up the subscription to product changes
-    const channel = supabase
-      .channel('public:products')
-      .on('postgres_changes', 
-        { event: 'INSERT', schema: 'public', table: 'products' }, 
-        (payload) => {
-          console.log('New product added via realtime:', payload);
-          // Map the new product to our Product type
-          if (payload.new) {
-            const newProduct: Product = {
-              id: payload.new.id,
-              name: payload.new.name,
-              price: payload.new.price,
-              stock: payload.new.stock,
-              brand: payload.new.brand,
-              category: payload.new.category,
-              itemNumber: payload.new.item_number,
-              discountPercentage: payload.new.discount_percentage,
-              lowStockThreshold: payload.new.low_stock_threshold,
-              createdAt: payload.new.created_at,
-              updatedAt: payload.new.updated_at,
-              image: payload.new.image || '',
-              description: payload.new.description || '',
-              size: payload.new.size || null,
-              color: payload.new.color || null
-            };
-            
-            setProducts(prev => [...prev, newProduct]);
-            
-            toast({
-              title: "Product Added",
-              description: `${newProduct.name} has been added to the inventory.`
-            });
-          }
-      })
-      .on('postgres_changes', 
-        { event: 'UPDATE', schema: 'public', table: 'products' }, 
-        (payload) => {
-          console.log('Product updated via realtime:', payload);
-          if (payload.new) {
-            const updatedProduct: Product = {
-              id: payload.new.id,
-              name: payload.new.name,
-              price: payload.new.price,
-              stock: payload.new.stock,
-              brand: payload.new.brand,
-              category: payload.new.category,
-              itemNumber: payload.new.item_number,
-              discountPercentage: payload.new.discount_percentage,
-              lowStockThreshold: payload.new.low_stock_threshold,
-              createdAt: payload.new.created_at,
-              updatedAt: payload.new.updated_at,
-              image: payload.new.image || '',
-              description: payload.new.description || '',
-              size: payload.new.size || null,
-              color: payload.new.color || null
-            };
-            
-            setProducts(prev => prev.map(p => 
-              p.id === updatedProduct.id ? updatedProduct : p
-            ));
-          }
-      })
-      .on('postgres_changes', 
-        { event: 'DELETE', schema: 'public', table: 'products' }, 
-        (payload) => {
-          console.log('Product deleted via realtime:', payload);
-          if (payload.old && payload.old.id) {
-            setProducts(prev => prev.filter(p => p.id !== payload.old.id));
-            
-            toast({
-              title: "Product Removed",
-              description: `A product has been removed from the inventory.`
-            });
-          }
-      })
-      .subscribe((status) => {
-        console.log('Realtime subscription status:', status);
-      });
-
-    console.log('Realtime subscription for products initialized');
-
-    // Cleanup function to remove the subscription when component unmounts
-    return () => {
-      console.log('Removing realtime subscription');
-      supabase.removeChannel(channel);
-    };
-  }, [toast, isAuthenticated]);
-
-  return { products, isLoading, error, isAuthenticated };
-}
+  }, []);
+  
+  // Use React Query to fetch products
+  const { 
+    data: products = [], 
+    isLoading, 
+    error,
+    refetch
+  } = useQuery({
+    queryKey: ['products'],
+    queryFn: getProducts,
+    staleTime: 60000, // 1 minute
+    refetchOnWindowFocus: false,
+  });
+  
+  return {
+    products,
+    isLoading,
+    error: error ? (error as Error).message : null,
+    isAuthenticated,
+    refetchProducts: refetch
+  };
+};

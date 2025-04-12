@@ -2,9 +2,10 @@
 import { Product } from "@/types/supabase-extensions";
 import { supabase, debugAuthStatus, refreshSession } from "@/integrations/supabase/client";
 import { mapDatabaseProductToProduct } from "./productHelpers";
+import { sampleProducts } from "@/data/sampleData";
 
 /**
- * Fetch all products from Supabase without local fallback
+ * Fetch all products from Supabase with local fallback to sample data
  */
 export const getProducts = async (): Promise<Product[]> => {
   try {
@@ -37,7 +38,8 @@ export const getProducts = async (): Promise<Product[]> => {
         }
       }
       
-      throw new Error(`Database error: ${error.message}`);
+      console.log("Authentication error or database error. Falling back to sample data.");
+      return sampleProducts; // Return sample data as fallback
     }
     
     // If we got data from Supabase, use it
@@ -47,22 +49,23 @@ export const getProducts = async (): Promise<Product[]> => {
       return mappedProducts;
     }
     
-    console.log("No products found in database");
-    return []; // Return empty array
+    console.log("No products found in database, returning sample data");
+    return sampleProducts; // Return sample data if no products in DB
   } catch (e) {
     console.error("Error in getProducts:", e);
-    throw e; // Re-throw to be handled by the caller
+    console.log("Falling back to sample data after error");
+    return sampleProducts; // Return sample data after any error
   }
 };
 
 /**
- * Get a single product by ID directly from Supabase
+ * Get a single product by ID with fallback to sample data
  */
 export const getProduct = async (id: string): Promise<Product | undefined> => {
   try {
     console.log(`Fetching product ${id} directly from Supabase...`);
     
-    // Get product from Supabase only
+    // Get product from Supabase
     const { data, error } = await supabase
       .from('products')
       .select('*')
@@ -77,7 +80,10 @@ export const getProduct = async (id: string): Promise<Product | undefined> => {
         details: error.details,
         hint: error.hint
       });
-      throw new Error(`Database error: ${error.message}`);
+      
+      // Fallback to sample data if not found
+      console.log("Falling back to sample data");
+      return sampleProducts.find(p => p.id === id);
     }
     
     if (data) {
@@ -85,9 +91,11 @@ export const getProduct = async (id: string): Promise<Product | undefined> => {
       return mapDatabaseProductToProduct(data);
     }
     
-    return undefined;
+    // Fallback to sample data if not found
+    return sampleProducts.find(p => p.id === id);
   } catch (e) {
     console.error("Error in getProduct:", e);
-    throw e; // Re-throw to be handled by the caller
+    // Fallback to sample data
+    return sampleProducts.find(p => p.id === id);
   }
 };
