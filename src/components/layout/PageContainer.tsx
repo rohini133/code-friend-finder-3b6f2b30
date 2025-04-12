@@ -14,7 +14,9 @@ export const PageContainer: React.FC<PageContainerProps> = ({
   title,
   subtitle 
 }) => {
-  const { isLoggedIn, userRole } = useAuth();
+  const auth = useAuth();
+  const isLoggedIn = auth?.isLoggedIn || false;
+  const userRole = auth?.userRole || null;
   
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-100">

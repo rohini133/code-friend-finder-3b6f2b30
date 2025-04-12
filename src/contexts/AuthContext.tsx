@@ -1,5 +1,6 @@
+
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase, enhancedLogin, debugAuthStatus } from "@/integrations/supabase/client";
 
@@ -32,13 +33,27 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Create a default auth context for when it's being used outside of the provider
+const defaultAuthContext: AuthContextType = {
+  isLoggedIn: false,
+  userRole: null,
+  userName: null,
+  login: async () => false,
+  logout: () => {},
+  checkAuthAccess: () => false,
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
+  
+  // We don't want to auto-login on the login page
+  const shouldAutoLogin = location.pathname !== "/login";
 
   // Auto-login for development - this will automatically log in with admin credentials
   useEffect(() => {
@@ -46,7 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log("Checking for existing session...");
       const { data } = await supabase.auth.getSession();
       
-      if (!data.session) {
+      if (!data.session && shouldAutoLogin) {
         console.log("No session found. Attempting auto-login for development...");
         try {
           // Auto-login with first admin user
@@ -78,7 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
     
     autoLogin();
-  }, [toast]);
+  }, [toast, shouldAutoLogin]);
 
   // Check for active Supabase session on mount and auth state changes
   useEffect(() => {
@@ -280,7 +295,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    console.error("useAuth was called outside of AuthProvider");
+    return defaultAuthContext;
   }
   return context;
 };
