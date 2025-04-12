@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -88,13 +89,12 @@ export const ShoppingCart = ({
 
     setIsLoading(true);
     try {
+      // Fix here: Pass individual parameters instead of an object
       const bill = await createBill(
         cartItems,
-        {
-          name: customerName,
-          phone: customerPhone,
-          email: customerEmail,
-        },
+        customerName,
+        customerPhone,
+        customerEmail,
         paymentMethod
       );
       

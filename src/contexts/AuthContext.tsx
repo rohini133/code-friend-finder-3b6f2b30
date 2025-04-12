@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase, enhancedLogin, debugAuthStatus } from "@/integrations/supabase/client";
 
 // Define fixed users for the system
 const USERS = [
@@ -9,13 +10,15 @@ const USERS = [
     username: "rohini25",
     password: "Rohini@123",
     role: "admin",
-    name: "Rohini Satale"
+    name: "Rohini Satale",
+    email: "rohini25@example.com"
   },
   {
     username: "balaji12",
     password: "Balaji@25",
     role: "cashier",
-    name: "Balaji Wagh"
+    name: "Balaji Wagh",
+    email: "balaji12@example.com"
   }
 ];
 
@@ -37,15 +40,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Check for active Supabase session on mount and auth state changes
   useEffect(() => {
-    // Check if user is logged in on component mount
-    const loggedIn = localStorage.getItem("isLoggedIn") === "true";
-    const role = localStorage.getItem("userRole");
-    const name = localStorage.getItem("username");
+    // First set up the auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log("Auth state change:", event, session ? "Session exists" : "No session");
+        const hasSession = !!session;
+        
+        // Only update if auth status changes
+        if (hasSession !== isLoggedIn) {
+          console.log(`Auth status changed: ${isLoggedIn} -> ${hasSession}`);
+          setIsLoggedIn(hasSession);
+          
+          if (hasSession) {
+            // Retrieve user role and name from localStorage as a fallback
+            const storedRole = localStorage.getItem("userRole");
+            const storedName = localStorage.getItem("username");
+            
+            if (storedRole && storedName) {
+              setUserRole(storedRole);
+              setUserName(storedName);
+            }
+          } else {
+            // If logged out, clear role and name
+            setUserRole(null);
+            setUserName(null);
+          }
+        }
+      }
+    );
     
-    setIsLoggedIn(loggedIn);
-    setUserRole(role);
-    setUserName(name);
+    // Then check for existing session
+    const checkSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error("Error fetching session:", error);
+        return;
+      }
+      
+      const hasSession = !!data.session;
+      console.log("Initial session check:", hasSession ? "Logged in" : "Not logged in");
+      
+      setIsLoggedIn(hasSession);
+      
+      if (hasSession) {
+        // Retrieve user role and name from localStorage as a fallback
+        const storedRole = localStorage.getItem("userRole");
+        const storedName = localStorage.getItem("username");
+        
+        if (storedRole && storedName) {
+          setUserRole(storedRole);
+          setUserName(storedName);
+        }
+      }
+    };
+    
+    checkSession();
+    
+    // Clean up subscription on unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
@@ -55,19 +111,56 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
     
     if (user) {
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userRole", user.role);
-      localStorage.setItem("username", user.name);
-      setIsLoggedIn(true);
-      setUserRole(user.role);
-      setUserName(user.name);
-      
-      toast({
-        title: "Login Successful",
-        description: `Welcome back, ${user.name}!`,
-      });
-      
-      return true;
+      try {
+        // Log in to Supabase with the corresponding email/password
+        const { success, error } = await enhancedLogin(user.email, user.password);
+        
+        if (!success) {
+          console.error("Supabase login failed:", error);
+          
+          // If Supabase login fails, we'll fall back to local authentication
+          toast({
+            variant: "destructive",
+            title: "Supabase Auth Warning",
+            description: "Using local auth mode. Some features may be limited.",
+          });
+        } else {
+          console.log("Supabase login successful");
+        }
+        
+        // Store authentication state
+        localStorage.setItem("isLoggedIn", "true");
+        localStorage.setItem("userRole", user.role);
+        localStorage.setItem("username", user.name);
+        
+        // Update state
+        setIsLoggedIn(true);
+        setUserRole(user.role);
+        setUserName(user.name);
+        
+        // Show success notification
+        toast({
+          title: "Login Successful",
+          description: `Welcome back, ${user.name}!`,
+        });
+        
+        // Debug auth status after login
+        setTimeout(() => {
+          debugAuthStatus();
+        }, 500);
+        
+        return true;
+      } catch (err) {
+        console.error("Login error:", err);
+        
+        toast({
+          variant: "destructive",
+          title: "Login Error",
+          description: "An error occurred during login. Please try again.",
+        });
+        
+        return false;
+      }
     }
     
     toast({
@@ -79,14 +172,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return false;
   };
 
-  const logout = () => {
-    localStorage.removeItem("isLoggedIn");
-    localStorage.removeItem("userRole");
-    localStorage.removeItem("username");
-    setIsLoggedIn(false);
-    setUserRole(null);
-    setUserName(null);
-    navigate("/login");
+  const logout = async () => {
+    try {
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+      
+      // Clear local storage
+      localStorage.removeItem("isLoggedIn");
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("username");
+      
+      // Update state
+      setIsLoggedIn(false);
+      setUserRole(null);
+      setUserName(null);
+      
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      
+      // Force logout even if Supabase fails
+      localStorage.removeItem("isLoggedIn");
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("username");
+      setIsLoggedIn(false);
+      setUserRole(null);
+      setUserName(null);
+      navigate("/login");
+    }
   };
 
   const checkAuthAccess = (requiredRole?: string) => {

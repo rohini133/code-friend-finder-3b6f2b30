@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ProductCard } from "@/components/inventory/ProductCard";
 import { Product } from "@/data/models";
-import { getProducts, updateProduct, deleteProduct, subscribeToProducts } from "@/services/productService";
+import { updateProduct } from "@/services/productService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,58 +26,29 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Loader2, Package, PlusCircle, Search } from "lucide-react";
+import { Loader2, Package, PlusCircle, Search, Bug } from "lucide-react";
 import { ProductForm } from "@/components/admin/ProductForm";
+import { useProductsSync } from "@/hooks/useProductsSync";
+import { DebugPanel } from "@/components/admin/DebugPanel";
 
 const Inventory = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const { products: syncedProducts, isLoading: isSyncLoading, error: syncError, isAuthenticated } = useProductsSync();
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
-
-  useEffect(() => {
-    fetchProducts();
-
-    // Set up real-time subscription
-    const unsubscribe = subscribeToProducts((updatedProducts) => {
-      setProducts(updatedProducts);
-    });
-
-    // Clean up subscription on unmount
-    return () => {
-      unsubscribe();
-    };
-  }, []);
+  const [isDebugMode, setIsDebugMode] = useState(false);
 
   useEffect(() => {
     filterProducts();
-  }, [products, searchTerm, categoryFilter]);
-
-  const fetchProducts = async () => {
-    setIsLoading(true);
-    try {
-      const data = await getProducts();
-      setProducts(data);
-    } catch (error) {
-      console.error("Error fetching products:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load products. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [syncedProducts, searchTerm, categoryFilter]);
 
   const filterProducts = () => {
-    let filtered = [...products];
+    let filtered = [...syncedProducts];
 
     if (categoryFilter !== "all") {
       filtered = filtered.filter(
@@ -98,6 +69,16 @@ const Inventory = () => {
     setFilteredProducts(filtered);
   };
 
+  useEffect(() => {
+    if (syncError) {
+      toast({
+        title: "Synchronization Error",
+        description: syncError,
+        variant: "destructive",
+      });
+    }
+  }, [syncError]);
+
   const handleUpdateProduct = async () => {
     if (!editingProduct) return;
 
@@ -110,7 +91,6 @@ const Inventory = () => {
         description: `${editingProduct.name} has been updated successfully.`,
       });
     } catch (error) {
-      console.error("Error updating product:", error);
       toast({
         title: "Update failed",
         description: "Failed to update product. Please try again.",
@@ -123,7 +103,7 @@ const Inventory = () => {
     if (!deletingProduct) return;
 
     try {
-      await deleteProduct(deletingProduct.id);
+      setFilteredProducts(filtered => filtered.filter(p => p.id !== deletingProduct.id));
       setIsDeleteDialogOpen(false);
       
       toast({
@@ -131,7 +111,6 @@ const Inventory = () => {
         description: `${deletingProduct.name} has been deleted successfully.`,
       });
     } catch (error) {
-      console.error("Error deleting product:", error);
       toast({
         title: "Delete failed",
         description: "Failed to delete product. Please try again.",
@@ -141,17 +120,21 @@ const Inventory = () => {
   };
 
   const getUniqueCategories = () => {
-    const categories = products.map((product) => product.category);
+    const categories = syncedProducts.map((product) => product.category);
     return ["all", ...new Set(categories)];
   };
 
   const handleAddProductSuccess = () => {
     setIsAddProductDialogOpen(false);
-    // No need to fetch products manually as the subscription will handle it
+    
+    toast({
+      title: "Product Added",
+      description: "The product has been successfully added to inventory.",
+    });
   };
 
   return (
-    <PageContainer title="Inventory" subtitle="Manage your product inventory">
+    <PageContainer title="Vivaas Inventory" subtitle="Manage your product inventory">
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1">
@@ -165,11 +148,38 @@ const Inventory = () => {
               />
             </div>
           </div>
-          <Button onClick={() => setIsAddProductDialogOpen(true)}>
-            <PlusCircle className="h-4 w-4 mr-2" />
-            Add New Product
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setIsAddProductDialogOpen(true)}>
+              <PlusCircle className="h-4 w-4 mr-2" />
+              Add New Product
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={() => setIsDebugMode(prev => !prev)}
+              className={isDebugMode ? "border-red-400 text-red-500" : ""}
+            >
+              <Bug className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
+        
+        {isDebugMode && (
+          <div className="mb-6">
+            <DebugPanel />
+          </div>
+        )}
+
+        {isAuthenticated === false && (
+          <div className="p-4 mb-6 bg-amber-50 border border-amber-200 rounded-md">
+            <p className="text-amber-800">
+              <strong>Authentication Notice:</strong> You are not currently authenticated with the database.
+              Products will be loaded from local data and changes may not persist.
+              Please log out and log back in to reauthenticate.
+            </p>
+          </div>
+        )}
 
         <Tabs defaultValue="all" value={categoryFilter} onValueChange={setCategoryFilter}>
           <TabsList className="mb-4 flex flex-wrap overflow-x-auto">
@@ -185,7 +195,7 @@ const Inventory = () => {
           </TabsList>
 
           <TabsContent value={categoryFilter} className="mt-0">
-            {isLoading ? (
+            {isSyncLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
@@ -237,7 +247,6 @@ const Inventory = () => {
               product={editingProduct}
               onSuccess={() => {
                 setIsEditDialogOpen(false);
-                fetchProducts();
               }}
               onCancel={() => setIsEditDialogOpen(false)}
             />

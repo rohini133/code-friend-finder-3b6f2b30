@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, MessageSquare, Printer, Download } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { sendBillToWhatsApp } from "@/services/billService";
-import { CartItem, BillItemWithProduct, BillWithItems } from "@/data/models";
+import { BillWithItems } from "@/data/models";
 import {
   Dialog,
   DialogContent,
@@ -18,77 +18,33 @@ import { generatePDF } from "@/utils/pdfGenerator";
 interface CheckoutDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  billId: string | null;
-  customerPhone?: string;
-  cartItems: CartItem[];
-  customerName?: string;
-  customerEmail?: string;
-  paymentMethod: "cash" | "card" | "digital-wallet";
-  subtotal: number;
-  tax: number;
-  total: number;
+  bill: BillWithItems | null;
 }
 
 export const CheckoutDialog = ({
   open,
   onOpenChange,
-  billId,
-  customerPhone,
-  cartItems,
-  customerName,
-  customerEmail,
-  paymentMethod,
-  subtotal,
-  tax,
-  total
+  bill
 }: CheckoutDialogProps) => {
   const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
 
-  const createBillWithItems = (): BillWithItems => {
-    if (!billId) throw new Error("Bill ID is required");
-    
-    const billItems: BillItemWithProduct[] = cartItems.map(item => ({
-      id: `bi-${Math.random().toString(36).substring(2, 9)}`,
-      billId: billId,
-      productId: item.product.id,
-      productPrice: item.product.price,
-      discountPercentage: item.product.discountPercentage,
-      quantity: item.quantity,
-      total: item.product.price * (1 - item.product.discountPercentage / 100) * item.quantity,
-      productName: item.product.name,
-      product: item.product
-    }));
-    
-    return {
-      id: billId,
-      items: billItems,
-      subtotal,
-      tax,
-      total,
-      customerName,
-      customerPhone,
-      customerEmail,
-      paymentMethod,
-      createdAt: new Date().toISOString(),
-      status: "completed",
-      userId: "system"
-    };
-  };
+  if (!bill) {
+    return null;
+  }
 
   const handleSendWhatsApp = async () => {
-    if (!billId) return;
+    if (!bill.id) return;
     
     setIsSendingWhatsApp(true);
     try {
-      const billWithItems = createBillWithItems();
-      await sendBillToWhatsApp(billWithItems);
+      await sendBillToWhatsApp(bill);
       
       toast({
         title: "WhatsApp Receipt Sent",
-        description: `The receipt has been sent to ${customerPhone}`,
+        description: `The receipt has been sent to ${bill.customerPhone}`,
       });
     } catch (error) {
       toast({
@@ -105,25 +61,46 @@ export const CheckoutDialog = ({
     setIsPrinting(true);
     
     try {
-      const billWithItems = createBillWithItems();
+      // Generate PDF content
+      const pdfBlob = generatePDF(bill);
       
-      // Generate and print PDF
-      const pdfBlob = generatePDF(billWithItems);
-      const printWindow = window.open('', '_blank');
+      // Create a URL for the PDF blob
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      
+      // Open the PDF in a new window for printing
+      const printWindow = window.open(pdfUrl, '_blank');
       
       if (printWindow) {
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-        printWindow.location.href = pdfUrl;
-        setTimeout(() => {
-          printWindow.print();
-          URL.revokeObjectURL(pdfUrl);
-        }, 1000);
+        printWindow.addEventListener('load', () => {
+          try {
+            printWindow.print();
+            setTimeout(() => {
+              printWindow.close();
+            }, 500);
+          } catch (printError) {
+            console.error("Print error:", printError);
+            toast({
+              title: "Print Failed",
+              description: "There was an error printing the receipt. Please try the download option instead.",
+              variant: "destructive",
+            });
+          }
+        });
+        
+        toast({
+          title: "Receipt Prepared",
+          description: "The receipt has been prepared for printing.",
+        });
+      } else {
+        toast({
+          title: "Print Failed",
+          description: "Could not open print window. Please check your browser settings.",
+          variant: "destructive",
+        });
+        
+        // Fallback - just open the PDF directly
+        window.open(pdfUrl, '_blank');
       }
-      
-      toast({
-        title: "Receipt Printed",
-        description: "The receipt has been sent to the printer.",
-      });
     } catch (error) {
       console.error("Print error:", error);
       toast({
@@ -137,7 +114,7 @@ export const CheckoutDialog = ({
   };
 
   const handleDownloadReceipt = () => {
-    if (!billId) {
+    if (!bill.id) {
       toast({
         title: "Download Failed",
         description: "Invalid bill information. Please try again.",
@@ -149,16 +126,14 @@ export const CheckoutDialog = ({
     setIsDownloading(true);
     
     try {
-      const billWithItems = createBillWithItems();
+      // Generate PDF content
+      const pdfBlob = generatePDF(bill);
       
-      // Generate PDF
-      const pdfBlob = generatePDF(billWithItems);
-      
-      // Create download link
+      // Create download link for PDF
       const url = URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Receipt-${billId}.pdf`;
+      link.download = `Vivaas-Receipt-${bill.id}.pdf`;
       document.body.appendChild(link);
       link.click();
       
@@ -170,7 +145,7 @@ export const CheckoutDialog = ({
       
       toast({
         title: "Receipt Downloaded",
-        description: "The receipt has been downloaded successfully.",
+        description: "The receipt has been downloaded as a PDF file.",
       });
     } catch (error) {
       console.error("Download error:", error);
@@ -190,7 +165,7 @@ export const CheckoutDialog = ({
         <DialogHeader>
           <DialogTitle>Bill Generated Successfully</DialogTitle>
           <DialogDescription>
-            Bill #{billId} has been created and inventory has been updated.
+            Bill #{bill.id} has been created and inventory has been updated.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
@@ -223,9 +198,9 @@ export const CheckoutDialog = ({
             Download Receipt
           </Button>
           
-          {customerPhone && (
+          {bill.customerPhone && (
             <Button 
-              className="w-full mb-3 dmart-button"
+              className="w-full mb-3"
               onClick={handleSendWhatsApp}
               disabled={isSendingWhatsApp}
             >

@@ -1,5 +1,5 @@
 
-import { useState, useRef, ChangeEvent, useEffect } from "react";
+import { useState, useRef, ChangeEvent } from "react";
 import { Product } from "@/data/models";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +53,6 @@ interface ProductFormProps {
 export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(product?.image || null);
-  const [formError, setFormError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const isEditing = !!product;
@@ -91,44 +90,10 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
         }
   });
 
-  // Clear any form errors when form values change
-  useEffect(() => {
-    if (formError) {
-      const subscription = form.watch(() => setFormError(null));
-      return () => subscription.unsubscribe();
-    }
-  }, [form, formError]);
-
   const handleSubmit = async (values: ProductFormValues) => {
     setIsSubmitting(true);
-    setFormError(null);
-    
     try {
-      console.log("Form submission values:", values);
-      
-      // Additional validation
-      if (!values.name.trim()) {
-        throw new Error("Product name is required");
-      }
-      
-      if (!values.brand.trim()) {
-        throw new Error("Brand is required");
-      }
-      
-      if (!values.category.trim()) {
-        throw new Error("Category is required");
-      }
-      
-      if (!values.itemNumber.trim()) {
-        throw new Error("Item number is required");
-      }
-      
-      if (values.price <= 0) {
-        throw new Error("Price must be greater than zero");
-      }
-      
       if (isEditing && product) {
-        console.log("Updating existing product:", product.id);
         await updateProduct({
           ...product,
           ...values,
@@ -139,8 +104,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           description: `${values.name} has been updated successfully.`,
         });
       } else {
-        // Add a new product
-        console.log("Adding new product:", values.name);
+        // Fix: Ensure all required fields are explicitly provided
         await addProduct({
           name: values.name,
           brand: values.brand,
@@ -160,20 +124,11 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           description: `${values.name} has been added successfully.`,
         });
       }
-      
-      console.log("Operation completed successfully");
       onSuccess();
     } catch (error) {
-      console.error("Error in product form:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      
-      // Set more detailed error message
-      setFormError(errorMessage);
-      
-      // Show toast with specific error message
       toast({
         title: isEditing ? "Update failed" : "Add failed",
-        description: `Failed to ${isEditing ? 'update' : 'add'} product: ${errorMessage}`,
+        description: `Failed to ${isEditing ? 'update' : 'add'} product. Please try again.`,
         variant: "destructive",
       });
     } finally {
@@ -222,20 +177,13 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-        {formError && (
-          <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
-            <p className="font-medium">Error</p>
-            <p className="text-sm">{formError}</p>
-          </div>
-        )}
-        
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="name"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Product Name*</FormLabel>
+                <FormLabel>Product Name</FormLabel>
                 <FormControl>
                   <Input placeholder="Enter product name" {...field} />
                 </FormControl>
@@ -249,7 +197,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             name="brand"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Brand*</FormLabel>
+                <FormLabel>Brand</FormLabel>
                 <FormControl>
                   <Input placeholder="Enter brand name" {...field} />
                 </FormControl>
@@ -265,7 +213,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             name="category"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Category*</FormLabel>
+                <FormLabel>Category</FormLabel>
                 <FormControl>
                   <Input placeholder="Enter category" {...field} />
                 </FormControl>
@@ -279,7 +227,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             name="itemNumber"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Item Number*</FormLabel>
+                <FormLabel>Item Number</FormLabel>
                 <FormControl>
                   <Input placeholder="Enter item number" {...field} />
                 </FormControl>
@@ -294,7 +242,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           name="description"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Description*</FormLabel>
+              <FormLabel>Description</FormLabel>
               <FormControl>
                 <Textarea 
                   placeholder="Enter product description" 
@@ -313,7 +261,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             name="price"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Price (₹)*</FormLabel>
+                <FormLabel>Price (₹)</FormLabel>
                 <FormControl>
                   <Input type="number" step="0.01" min="0" {...field} />
                 </FormControl>
@@ -341,7 +289,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             name="stock"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Stock Quantity*</FormLabel>
+                <FormLabel>Stock Quantity</FormLabel>
                 <FormControl>
                   <Input type="number" min="0" {...field} />
                 </FormControl>
@@ -357,7 +305,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
             name="lowStockThreshold"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Low Stock Threshold*</FormLabel>
+                <FormLabel>Low Stock Threshold</FormLabel>
                 <FormControl>
                   <Input type="number" min="1" {...field} />
                 </FormControl>
@@ -403,7 +351,7 @@ export function ProductForm({ product, onSuccess, onCancel }: ProductFormProps) 
           name="image"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Product Image*</FormLabel>
+              <FormLabel>Product Image</FormLabel>
               <div className="space-y-4">
                 {imagePreview && (
                   <div className="relative w-full max-w-[200px] h-[150px] border rounded-md overflow-hidden">
